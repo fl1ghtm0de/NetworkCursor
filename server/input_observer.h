@@ -5,17 +5,22 @@
 #include <functional>  // For std::function
 #include <thread>
 #include <map>
-
-#ifdef __linux__
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#endif
+#include <limits>
+#include <cstdint>     // For int32_t, int64_t
 
 #ifdef _WIN32
-#include <windows.h>
+    #include <windows.h>
+#elif __APPLE__
+    #include <IOKit/hid/IOHIDManager.h>
+    #include <ApplicationServices/ApplicationServices.h>
+    #include <unordered_set>
+#elif __linux__
+    #include <X11/Xlib.h>
+    #include <X11/Xutil.h>
 #endif
 
 #include "common/defines.h"
+
 
 struct SMouseCoords {
     int32_t xDelta;
@@ -23,10 +28,21 @@ struct SMouseCoords {
 
     SMouseCoords() : xDelta(0), yDelta(0) {}
 
+#ifdef _WIN32
     void setFromLong(LONG x, LONG y) {
         xDelta = (x < INT32_MIN) ? INT32_MIN : (x > INT32_MAX) ? INT32_MAX : static_cast<int32_t>(x);
         yDelta = (y < INT32_MIN) ? INT32_MIN : (y > INT32_MAX) ? INT32_MAX : static_cast<int32_t>(y);
     }
+#elif __APPLE__
+    void setFromLong(int64_t x, int64_t y) {
+        xDelta = (x < std::numeric_limits<int32_t>::min()) ? std::numeric_limits<int32_t>::min()
+                : (x > std::numeric_limits<int32_t>::max()) ? std::numeric_limits<int32_t>::max()
+                : static_cast<int32_t>(x);
+        yDelta = (y < std::numeric_limits<int32_t>::min()) ? std::numeric_limits<int32_t>::min()
+                : (y > std::numeric_limits<int32_t>::max()) ? std::numeric_limits<int32_t>::max()
+                : static_cast<int32_t>(y);
+    }
+#endif
 };
 
 
@@ -36,8 +52,19 @@ public:
     InputObserver(const std::function<void(int, int)>& callback, const std::function<void(int)>& keyPressCallback, const std::function<void(int)>& borderHitcallback);
     ~InputObserver();
 
+#ifdef _WIN32
     static LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
     static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam);
+    void RegisterGlobalRawMouseInput(HWND hwnd);
+
+    HINSTANCE hInstance;
+    WNDCLASS wc;
+    HWND hwnd;
+    HHOOK keyboardHook;
+#elif __APPLE__
+    static void HIDCallback(void* context, IOReturn result, void* sender, IOHIDValueRef value);
+    static CGEventRef keyEventCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon);
+#endif
 
     static InputObserver* instance;
 
@@ -50,34 +77,14 @@ public:
     void setLocked(bool state);
 
     bool isAtBorder();
-
+    bool isRunning = false;
     int currScreen = SCREEN_END;
 
 private:
-    HINSTANCE hInstance;
-    WNDCLASS wc;
-    HWND hwnd;
-    HHOOK keyboardHook;
-
     int screenWidth;
     int screenHeight;
     int currX;
     int currY;
-
-    std::map<int, std::string> keyMap = {
-        {0x41, "A"}, {0x42, "B"}, {0x43, "C"}, {0x44, "D"}, {0x45, "E"},
-        {0x46, "F"}, {0x47, "G"}, {0x48, "H"}, {0x49, "I"}, {0x4A, "J"},
-        {0x4B, "K"}, {0x4C, "L"}, {0x4D, "M"}, {0x4E, "N"}, {0x4F, "O"},
-        {0x50, "P"}, {0x51, "Q"}, {0x52, "R"}, {0x53, "S"}, {0x54, "T"},
-        {0x55, "U"}, {0x56, "V"}, {0x57, "W"}, {0x58, "X"}, {0x59, "Y"},
-        {0x5A, "Z"}, {0x30, "0"}, {0x31, "1"}, {0x32, "2"}, {0x33, "3"},
-        {0x34, "4"}, {0x35, "5"}, {0x36, "6"}, {0x37, "7"}, {0x38, "8"},
-        {0x39, "9"}, {VK_RETURN, "Enter"}, {VK_SPACE, "Space"},
-        {VK_TAB, "Tab"}, {VK_BACK, "Backspace"}, {VK_ESCAPE, "Escape"},
-        {VK_SHIFT, "Shift"}, {VK_CONTROL, "Control"}, {VK_MENU, "Alt"}
-    };
-
-    void RegisterGlobalRawMouseInput(HWND hwnd);
 
     SMouseCoords sMouseData;
     bool mouseMoveThreadRunning;
@@ -85,6 +92,7 @@ private:
     std::function<void(int)> onKeyPressCallback;
     std::function<void(int)> onBorderHitCallback;
     std::thread mouseMoveThread;
+    std::thread keyPressThread;
     void start();
     void stop();
 #ifdef __linux__

@@ -1,11 +1,14 @@
 #include <iostream>
-#include <winsock2.h>
-#include <ws2tcpip.h>
+// #ifdef _WIN32
+// #include <winsock2.h>
+// #include <ws2tcpip.h>
+// #endif
 #include <thread>
 #include <vector>
 #include "server.h"
 #include "common/defines.h"
 #include "common/packet.h"
+#include <cstring>
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -22,16 +25,22 @@ Server::Server() :
         }
     )
 {
+#ifdef _WIN32
     int iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
     if (iResult != 0) {
         std::cerr << "WSAStartup failed: " << iResult << std::endl;
         return;
     }
+#endif
 
     listeningSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (listeningSocket == INVALID_SOCKET) {
+#ifdef _WIN32
         std::cerr << "Socket creation failed: " << WSAGetLastError() << std::endl;
         WSACleanup();
+#else
+        std::cerr << "Socket creation failed: " << strerror(errno) << std::endl;
+#endif
         return;
     }
 
@@ -40,16 +49,26 @@ Server::Server() :
     serverAddr.sin_addr.s_addr = INADDR_ANY;
 
     if (bind(listeningSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
+#ifdef _WIN32
         std::cerr << "Bind failed: " << WSAGetLastError() << std::endl;
         closesocket(listeningSocket);
         WSACleanup();
+#else
+        std::cerr << "Bind failed: " << strerror(errno) << std::endl;
+        close(listeningSocket);
+#endif
         return;
     }
 
     if (listen(listeningSocket, SOMAXCONN) == SOCKET_ERROR) {
+#ifdef _WIN32
         std::cerr << "Listen failed: " << WSAGetLastError() << std::endl;
         closesocket(listeningSocket);
         WSACleanup();
+#else
+        std::cerr << "Listen failed: " << strerror(errno) << std::endl;
+        close(listeningSocket);
+#endif
         return;
     }
 
@@ -57,17 +76,31 @@ Server::Server() :
 }
 
 Server::~Server() {
+#ifdef _WIN32
     closesocket(listeningSocket);
     WSACleanup();
+#else
+    close(listeningSocket);
+#endif
     std::cout << "Server resources cleaned up." << std::endl;
 }
 
-void Server::handleClient(SOCKET clientSocket) {
+void Server::shutdown(){
+#ifdef _WIN32
+    closesocket(listeningSocket);
+    WSACleanup();
+#else
+    close(listeningSocket);
+#endif
+    std::cout << "Server resources cleaned up." << std::endl;
+}
+
+void Server::handleClient(SOCKET_TYPE clientSocket) {
     char buffer[1024];
     int clientDirection = -1;
 
     while (true) {
-        ZeroMemory(buffer, 1024);
+        std::memset(buffer, 0, 1024);
         int32_t header = -1;
         int bytesReceived = recv(clientSocket, buffer, 1024, 0);
 
@@ -96,7 +129,7 @@ void Server::handleClient(SOCKET clientSocket) {
 
                     if (!clientAdded) {
                         //std::cout << "Duplicate identifier. Closing connection with " << clientIdentifier << std::endl;
-                        closesocket(clientSocket);
+                        CLOSE_SOCKET(clientSocket);
                         return;
                     }
                     break;
@@ -138,7 +171,11 @@ void Server::handleClient(SOCKET clientSocket) {
             break;
         }
         else {
+            #ifdef _WIN32
             std::cerr << "Receive failed for client with direction: " << clientDirection << " error: " << WSAGetLastError() << std::endl;
+            #else
+            std::cerr << "Receive failed for client with direction: " << clientDirection << " error: " << strerror(errno) << std::endl;
+            #endif
             break;
         }
     }
@@ -150,16 +187,20 @@ void Server::handleClient(SOCKET clientSocket) {
     }
 
     // Close the client socket after the loop ends
-    closesocket(clientSocket);
+    CLOSE_SOCKET(clientSocket);
     std::cout << "Closed connection with client with direction: " << clientDirection << "." << std::endl;
     removeClient(clientDirection);
 }
 
 void Server::acceptAndReceive() {
     while (true) {
-        SOCKET clientSocket = accept(listeningSocket, NULL, NULL);
+        SOCKET_TYPE clientSocket = accept(listeningSocket, NULL, NULL);
         if (clientSocket == INVALID_SOCKET) {
+#ifdef _WIN32
             std::cerr << "Accept failed: " << WSAGetLastError() << std::endl;
+#else
+            std::cerr << "Accept failed: " << strerror(errno) << std::endl;
+#endif
             continue;
         }
 
@@ -179,7 +220,7 @@ void Server::removeClient(int clientDirection) {
 void Server::sendPacketToClient(int clientDirection, void* packet, int size) {
     std::cout << "Attempting to send packet to direction: " << clientDirection << std::endl;
 
-    SOCKET clientSocket;
+    SOCKET_TYPE clientSocket;
     {
         std::lock_guard<std::mutex> lock(mapMutex);
         auto it = clientIDMap.find(clientDirection);
@@ -188,13 +229,18 @@ void Server::sendPacketToClient(int clientDirection, void* packet, int size) {
         }
         else {
             std::cerr << "Client direction: " << clientDirection << " not found." << std::endl;
+            setCurrentScreen(SCREEN_END);
             return;
         }
     }
 
     int sendResult = send(clientSocket, reinterpret_cast<char*>(packet), size, 0);
     if (sendResult == SOCKET_ERROR) {
+        #ifdef _WIN32
         std::cerr << "Failed to send packet to direction" << clientDirection << " error: " << WSAGetLastError() << std::endl;
+        #else
+        std::cerr << "Failed to send packet to direction" << clientDirection << " error: " << strerror(errno) << std::endl;
+        #endif
         std::lock_guard<std::mutex> lock(mapMutex);
         clientIDMap.erase(clientDirection);
     }
@@ -204,8 +250,18 @@ void Server::sendPacketToClient(int clientDirection, void* packet, int size) {
 }
 
 void Server::setCurrentScreen(int direction) {
-    currentScreen = direction;
-    //inputObserver.currScreen = SCREEN_END;
+    std::lock_guard<std::mutex> lock(mapMutex);
+    auto it = clientIDMap.find(direction);
+    if (it != clientIDMap.end()) {
+        currentScreen = direction;
+        inputObserver.currScreen = direction;
+    }
+    else {
+        std::cerr << "Client direction: " << direction << " not found." << std::endl;
+        currentScreen = SCREEN_END;
+        inputObserver.currScreen = SCREEN_END;
+        return;
+    }
 }
 
 void Server::sendMouseMovePacket(int xDelta, int yDelta) {

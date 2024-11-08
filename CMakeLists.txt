@@ -12,14 +12,25 @@ include_directories(${CMAKE_SOURCE_DIR})
 
 # Define the first executable with its sources
 add_executable(NetworkingServer "server/server.cpp" "server/server.h" "common/defines.h" "server/main.cpp" "common/packet.h" "server/input_observer.h" "server/input_observer.cpp")
-target_link_libraries(NetworkingServer ws2_32)
-if (CMAKE_VERSION VERSION_GREATER 3.12)
-  set_property(TARGET NetworkingServer PROPERTY CXX_STANDARD 20)
+
+# Platform-specific libraries and settings
+if(WIN32)
+    target_link_libraries(NetworkingServer ws2_32)
 endif()
 
-# Define the second executable with its own sources
-add_executable(NetworkingClient "client/client.cpp" "client/client.h" "common/defines.h" "client/main.cpp" "common/packet.h" "client/input_provider.cpp" "client/input_provider.h")
-target_link_libraries(NetworkingClient ws2_32)
 if (CMAKE_VERSION VERSION_GREATER 3.12)
-  set_property(TARGET NetworkingClient PROPERTY CXX_STANDARD 20)
+    set_property(TARGET NetworkingServer PROPERTY CXX_STANDARD 20)
 endif()
+
+if(APPLE)
+    target_link_libraries(NetworkingServer "-framework ApplicationServices" "-framework IOKit" "-framework Carbon")
+endif()
+
+# Define the second executable with its own sources (currently commented out)
+# add_executable(NetworkingClient "client/client.cpp" "client/client.h" "common/defines.h" "client/main.cpp" "common/packet.h" "client/input_provider.cpp" "client/input_provider.h")
+# if(WIN32)
+#     target_link_libraries(NetworkingClient ws2_32)
+# endif()
+# if (CMAKE_VERSION VERSION_GREATER 3.12)
+#   set_property(TARGET NetworkingClient PROPERTY CXX_STANDARD 20)
+# endif()
