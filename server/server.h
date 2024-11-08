@@ -36,7 +36,7 @@ public:
     void sendPacketToClient(int clientDirection, void* packet, int size);
     void removeClient(int clientDirection);
 
-    void sendMouseMovePacket(int xDelta, int yDelta);
+    void sendMouseMovePacket(int axis, int value);
     void sendKeyPressPacket(int keyID);
     void setCurrentScreen(int direction);
 

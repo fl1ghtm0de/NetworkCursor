@@ -20,6 +20,8 @@ struct SPacketMouseMove {
     int32_t header;
     int32_t xDelta;
     int32_t yDelta;
+
+    SPacketMouseMove() : header(-1), xDelta(0), yDelta(0) {};
 };
 
 struct SPacketMouseMoveResponse {

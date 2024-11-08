@@ -14,8 +14,8 @@
 
 Server::Server() :
     inputObserver(
-        [this](int xDelta, int yDelta) {
-            sendMouseMovePacket(xDelta, yDelta);
+        [this](int axis, int value) {
+            sendMouseMovePacket(axis, value);
         },
         [this](int keyCode) {
             sendKeyPressPacket(keyCode);
@@ -264,8 +264,25 @@ void Server::setCurrentScreen(int direction) {
     }
 }
 
-void Server::sendMouseMovePacket(int xDelta, int yDelta) {
-    SPacketMouseMove packet = { HEADER_MOUSE_MOVE, xDelta, yDelta };
+void Server::sendMouseMovePacket(int axis, int value) {
+    SPacketMouseMove packet;
+    packet.header = HEADER_MOUSE_MOVE;
+    switch (axis) {
+        case eAxis::X_AXIS: {
+            packet.xDelta = value;
+            break;
+        }
+
+        case eAxis::Y_AXIS: {
+            packet.yDelta = value;
+            break;
+        }
+
+        default: {
+            std::cout << "invalid axis value: " << axis << std::endl;
+            return;
+        }
+    }
     if (currentScreen < SCREEN_END) {
         sendPacketToClient(currentScreen, &packet, sizeof(packet));
     }

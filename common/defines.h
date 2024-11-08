@@ -36,4 +36,9 @@ enum eScreenDirections {
     SCREEN_END
 };
 
+enum eAxis {
+    X_AXIS,
+    Y_AXIS
+};
+
 #pragma pack(pop)

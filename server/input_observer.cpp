@@ -173,7 +173,8 @@ LRESULT CALLBACK InputObserver::WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
 
                 if (observer->currScreen < SCREEN_END) {
                     if (observer->onMoveCallback) {
-                        observer->onMoveCallback(observer->sMouseData.xDelta, observer->sMouseData.yDelta);
+                        observer->onMoveCallback(eAxis::X_AXIS, observer->sMouseData.xDelta);
+                        observer->onMoveCallback(eAxis::Y_AXIS, observer->sMouseData.yDelta);
                     }
 
                     observer->setMousePosition(observer->screenWidth / 2, observer->screenHeight / 2);
@@ -311,53 +312,48 @@ void InputObserver::HIDCallback(void* context, IOReturn result, void* sender, IO
         int x1, y1;
         observer->getMousePosition(x1, y1);
         int intValue = IOHIDValueGetIntegerValue(value);
+
         if (intValue != 0) {
-            if (usage == kHIDUsage_GD_X) {
-                observer->sMouseData.xDelta = intValue;
-            } else if (usage == kHIDUsage_GD_Y) {
-                observer->sMouseData.yDelta = intValue;
-            }
-
-            // Update current position based on deltas
-            observer->currX += observer->sMouseData.xDelta;
-            observer->currY += observer->sMouseData.yDelta;
-
             int screenWidth = observer->screenWidth;
             int screenHeight = observer->screenHeight;
 
-            observer->getMousePosition(observer->currX, observer->currY);
+            if (usage == kHIDUsage_GD_X) {
+                observer->getMousePosition(observer->currX, observer->currY);
 
-            // Ensure the cursor stays within screen boundaries
-            if (observer->currX < 0) observer->currX = 0;
-            if (observer->currY < 0) observer->currY = 0;
-            if (observer->currX > screenWidth - 1) observer->currX = screenWidth - 1;
-            if (observer->currY > screenHeight - 1) observer->currY = screenHeight - 1;
-
-            // Check for border hits and invoke the callback if necessary
-            if (observer->onBorderHitCallback) {
-                if (observer->currX <= 0) {
-                    observer->onBorderHitCallback(SCREEN_LEFT);
-                    // observer->currScreen = SCREEN_LEFT;
-                } else if (observer->currX >= screenWidth - 1) {
-                    observer->onBorderHitCallback(SCREEN_RIGHT);
-                    // observer->currScreen = SCREEN_RIGHT;
-                } else if (observer->currY <= 0) {
-                    observer->onBorderHitCallback(SCREEN_TOP);
-                    // observer->currScreen = SCREEN_TOP;
-                } else if (observer->currY >= screenHeight - 1) {
-                    observer->onBorderHitCallback(SCREEN_BOTTOM);
-                    // observer->currScreen = SCREEN_BOTTOM;
-                }
-            }
-
-            // Handle mouse movement within screen boundaries
-            if (observer->currScreen < SCREEN_END) {
-                if (observer->onMoveCallback) {
-                    observer->onMoveCallback(observer->sMouseData.xDelta, observer->sMouseData.yDelta);
+                if (observer->onBorderHitCallback) {
+                    if (observer->currX <= 0) {
+                        observer->onBorderHitCallback(SCREEN_LEFT);
+                    }
+                    else if (observer->currX >= screenWidth - 1) {
+                        observer->onBorderHitCallback(SCREEN_RIGHT);
+                    }
                 }
 
-                // Reset mouse position to the center of the screen if needed
-                observer->setMousePosition(screenWidth / 2, screenHeight / 2);
+                if (observer->currScreen < SCREEN_END) {
+                    if (observer->onMoveCallback) {
+                        observer->onMoveCallback(eAxis::X_AXIS, intValue);
+                    }
+                    observer->setMousePosition(screenWidth / 2, screenHeight / 2);
+                }
+            } 
+            else if (usage == kHIDUsage_GD_Y) {
+                observer->getMousePosition(observer->currX, observer->currY);
+
+                if (observer->onBorderHitCallback) {
+                    if (observer->currY <= 0) {
+                        observer->onBorderHitCallback(SCREEN_TOP);
+                    }
+                    else if (observer->currY >= screenHeight - 1) {
+                        observer->onBorderHitCallback(SCREEN_BOTTOM);
+                    }
+                }
+
+                if (observer->currScreen < SCREEN_END) {
+                    if (observer->onMoveCallback) {
+                        observer->onMoveCallback(eAxis::Y_AXIS, intValue);
+                    }
+                    observer->setMousePosition(screenWidth / 2, screenHeight / 2);
+                }
             }
         }
     }
