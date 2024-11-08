@@ -193,7 +193,7 @@ LRESULT CALLBACK InputObserver::LowLevelKeyboardProc(int nCode, WPARAM wParam, L
         KBDLLHOOKSTRUCT* pKeyboard = reinterpret_cast<KBDLLHOOKSTRUCT*>(lParam);
         int key = pKeyboard->vkCode;
 
-        if (instance->keyMap.find(key) != instance->keyMap.end()) {
+        if (keyMap.find(key) != keyMap.end()) {
             if (instance->onKeyPressCallback && instance->currScreen < SCREEN_END) {
                 instance->onKeyPressCallback(key);
             }
