@@ -64,6 +64,7 @@ public:
 #elif __APPLE__
     static void HIDCallback(void* context, IOReturn result, void* sender, IOHIDValueRef value);
     static CGEventRef keyEventCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon);
+    static CGEventRef myCGEventCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon);
 #endif
 
     static InputObserver* instance;
@@ -91,6 +92,7 @@ private:
     std::function<void(int, int)> onMoveCallback;  // Callback for mouse movement
     std::function<void(int)> onKeyPressCallback;
     std::function<void(int)> onBorderHitCallback;
+
     std::thread mouseMoveThread;
     std::thread keyPressThread;
     void start();
