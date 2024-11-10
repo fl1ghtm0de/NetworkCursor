@@ -62,9 +62,11 @@ public:
     HWND hwnd;
     HHOOK keyboardHook;
 #elif __APPLE__
-    static void HIDCallback(void* context, IOReturn result, void* sender, IOHIDValueRef value);
+    int* xDelta = nullptr;
+    int* yDelta = nullptr;
+
+    static void HIDInputCallback(void* context, IOReturn result, void* sender, IOHIDValueRef value);
     static CGEventRef keyEventCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon);
-    static CGEventRef myCGEventCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon);
 #endif
 
     static InputObserver* instance;
@@ -79,6 +81,7 @@ public:
 
     bool isAtBorder();
     bool isRunning = false;
+    bool positionReset = false;
     int currScreen = SCREEN_END;
 
 private:

@@ -230,31 +230,60 @@ void InputObserver::start() {
 
     // Launch the observer task on a new thread
     mouseMoveThread = std::thread([this]() {
-    CFMachPortRef eventTap = CGEventTapCreate(
-                                                kCGSessionEventTap,
-                                                kCGHeadInsertEventTap,
-                                                kCGEventTapOptionDefault,
-                                                (1 << kCGEventMouseMoved),
-                                                myCGEventCallback,
-                                                NULL);
-
-        if (!eventTap)
-        {
-            fprintf(stderr, "failed to create event tap\n");
-            return;
+        IOHIDManagerRef hidManager = IOHIDManagerCreate(kCFAllocatorDefault, kIOHIDOptionsTypeNone);
+        if (hidManager == nullptr) {
+            std::cerr << "Failed to create HID Manager." << std::endl;
+            return -1;
         }
 
-        CFRunLoopSourceRef runLoopSource = CFMachPortCreateRunLoopSource(
-                                                                    kCFAllocatorDefault,
-                                                                    eventTap,
-                                                                    0);
-        CFRunLoopAddSource(
-                        CFRunLoopGetCurrent(),
-                        runLoopSource,
-                        kCFRunLoopCommonModes);
+        // Set up a dictionary to match mouse devices
+        CFMutableDictionaryRef matchingDict = CFDictionaryCreateMutable(
+            kCFAllocatorDefault, 0,
+            &kCFTypeDictionaryKeyCallBacks,
+            &kCFTypeDictionaryValueCallBacks
+        );
 
-    CGEventTapEnable(eventTap, true);
-    CFRunLoopRun();
+        // Define integer variables to hold the usage page and usage values
+        int usagePageValue = kHIDPage_GenericDesktop;
+        int usageValue = kHIDUsage_GD_Mouse;
+
+        CFNumberRef usagePage = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &usagePageValue);
+        CFNumberRef usage = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &usageValue);
+
+        CFDictionarySetValue(matchingDict, CFSTR(kIOHIDDeviceUsagePageKey), usagePage);
+        CFDictionarySetValue(matchingDict, CFSTR(kIOHIDDeviceUsageKey), usage);
+
+        // Set device matching criteria
+        IOHIDManagerSetDeviceMatching(hidManager, matchingDict);
+
+        // Clean up temporary CF objects
+        CFRelease(usagePage);
+        CFRelease(usage);
+        CFRelease(matchingDict);
+
+        // Register the input callback to handle incoming events
+        IOHIDManagerRegisterInputValueCallback(hidManager, HIDInputCallback, nullptr);
+
+        // Schedule the HID manager to run in the default run loop
+        IOHIDManagerScheduleWithRunLoop(hidManager, CFRunLoopGetCurrent(), kCFRunLoopDefaultMode);
+
+        // Open the HID Manager
+        IOReturn openStatus = IOHIDManagerOpen(hidManager, kIOHIDOptionsTypeNone);
+        if (openStatus != kIOReturnSuccess) {
+            std::cerr << "Failed to open HID Manager." << std::endl;
+            CFRelease(hidManager);
+            return -1;
+        }
+
+        // Run the main loop to listen for events
+        std::cout << "Listening for mouse deltas..." << std::endl;
+        CFRunLoopRun();
+
+        // Cleanup (not reached in this example, but good practice)
+        IOHIDManagerClose(hidManager, kIOHIDOptionsTypeNone);
+        CFRelease(hidManager);
+
+        return 0;
     });
 
     keyPressThread = std::thread([this]() {
@@ -290,56 +319,7 @@ void InputObserver::start() {
     });
 }
 
-CGEventRef InputObserver::myCGEventCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon)
-{
-    InputObserver* observer = InputObserver::instance;
-    if (!observer) return NULL;
-    if (type != kCGEventMouseMoved) {
-        return event;
-    }
-
-    CGPoint location = CGEventGetLocation(event);
-    CGEventRef event2 = CGEventCreate(nullptr);
-    CGPoint point = CGEventGetLocation(event2);
-    CFRelease(event2);
-
-    int screenWidth = observer->screenWidth;
-    int screenHeight = observer->screenHeight;
-    int xDelta = static_cast<int>(point.x) - (int)location.x;
-    int yDelta = static_cast<int>(point.y) - (int)location.y;
-
-    std::cout << "x: " << xDelta << " y: " << yDelta << std::endl;
-
-    observer->getMousePosition(observer->currX, observer->currY);
-    if (observer->onBorderHitCallback) {
-        if (observer->currX <= 0) {
-            observer->onBorderHitCallback(SCREEN_LEFT);
-        }
-        else if (observer->currX >= screenWidth - 1) {
-            observer->onBorderHitCallback(SCREEN_RIGHT);
-        }
-        else if (observer->currY <= 0) {
-            observer->onBorderHitCallback(SCREEN_TOP);
-        }
-        else if (observer->currY >= screenHeight - 1) {
-            observer->onBorderHitCallback(SCREEN_BOTTOM);
-        }
-    }
-
-    if (observer->currScreen < SCREEN_END) {
-        if (observer->onMoveCallback) {
-            observer->onMoveCallback(xDelta, yDelta);
-        }
-        observer->setMousePosition(screenWidth / 2, screenHeight / 2);
-    }
-
-    // CGWarpMouseCursorPosition(CGPointMake(100, 100));
-
-    // fancyPrintLocation(location);
-    return event;
-}
-
-void InputObserver::HIDCallback(void* context, IOReturn result, void* sender, IOHIDValueRef value) {
+void InputObserver::HIDInputCallback(void* context, IOReturn result, void* sender, IOHIDValueRef value) {
     InputObserver* observer = InputObserver::instance;
     if (!observer) return;
 
@@ -347,56 +327,160 @@ void InputObserver::HIDCallback(void* context, IOReturn result, void* sender, IO
     uint32_t usagePage = IOHIDElementGetUsagePage(element);
     uint32_t usage = IOHIDElementGetUsage(element);
 
-    // Ensure the event is related to mouse movement
+    // Check if the usage page and usage correspond to X or Y axis movement
     if (usagePage == kHIDPage_GenericDesktop) {
-        int x1, y1;
-        observer->getMousePosition(x1, y1);
-        int intValue = IOHIDValueGetIntegerValue(value);
+        int32_t movement = IOHIDValueGetIntegerValue(value);
 
-        if (intValue != 0) {
+        if (usage == kHIDUsage_GD_X) {
+            // Update xDelta value
+            observer->xDelta = new int(movement);
+        } else if (usage == kHIDUsage_GD_Y) {
+            // Update yDelta value
+            observer->yDelta = new int(movement);
+        }
+
+        // Print deltas if both are set
+        if (observer->xDelta && observer->yDelta) {
             int screenWidth = observer->screenWidth;
             int screenHeight = observer->screenHeight;
 
-            if (usage == kHIDUsage_GD_X) {
-                observer->getMousePosition(observer->currX, observer->currY);
-                if (observer->onBorderHitCallback) {
-                    if (observer->currX <= 0) {
-                        observer->onBorderHitCallback(SCREEN_LEFT);
-                    }
-                    else if (observer->currX >= screenWidth - 1) {
-                        observer->onBorderHitCallback(SCREEN_RIGHT);
-                    }
-                }
+            observer->getMousePosition(observer->currX, observer->currY);
 
-                if (observer->currScreen < SCREEN_END) {
-                    if (observer->onMoveCallback) {
-                        observer->onMoveCallback(eAxis::X_AXIS, intValue);
-                    }
-                    observer->setMousePosition(screenWidth / 2, screenHeight / 2);
+            if (observer->onBorderHitCallback) {
+                if (observer->currX <= 0) {
+                    observer->onBorderHitCallback(SCREEN_LEFT);
+                }
+                else if (observer->currX >= screenWidth - 1) {
+                    observer->onBorderHitCallback(SCREEN_RIGHT);
+                }
+                else if (observer->currY <= 0) {
+                    observer->onBorderHitCallback(SCREEN_TOP);
+                }
+                else if (observer->currY >= screenHeight - 1) {
+                    observer->onBorderHitCallback(SCREEN_BOTTOM);
                 }
             }
-            else if (usage == kHIDUsage_GD_Y) {
 
-                observer->getMousePosition(observer->currX, observer->currY);
-                if (observer->onBorderHitCallback) {
-                    if (observer->currY <= 0) {
-                        observer->onBorderHitCallback(SCREEN_TOP);
-                    }
-                    else if (observer->currY >= screenHeight - 1) {
-                        observer->onBorderHitCallback(SCREEN_BOTTOM);
-                    }
-                }
+            // Clean up memory and reset
+            delete observer->xDelta;
+            delete observer->yDelta;
+            observer->xDelta = nullptr;
+            observer->yDelta = nullptr;
 
-                if (observer->currScreen < SCREEN_END) {
-                    if (observer->onMoveCallback) {
-                        observer->onMoveCallback(eAxis::Y_AXIS, intValue);
-                    }
-                    observer->setMousePosition(screenWidth / 2, screenHeight / 2);
-                }
+            if (observer->currScreen < SCREEN_END) {
+                CGWarpMouseCursorPosition(CGPointMake(screenWidth / 2, screenHeight / 2));
             }
         }
     }
 }
+
+// CGEventRef InputObserver::myCGEventCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon)
+// {
+//     InputObserver* observer = InputObserver::instance;
+//     if (!observer) return NULL;
+//     if (type != kCGEventMouseMoved) {
+//         return event;
+//     }
+
+//     CGPoint location = CGEventGetLocation(event);
+//     CGEventRef event2 = CGEventCreate(nullptr);
+//     CGPoint point = CGEventGetLocation(event2);
+//     CFRelease(event2);
+
+//     int screenWidth = observer->screenWidth;
+//     int screenHeight = observer->screenHeight;
+//     int xDelta = (int)location.x - static_cast<int>(point.x);
+//     int yDelta = (int)location.y - static_cast<int>(point.y);
+
+//     observer->getMousePosition(observer->currX, observer->currY);
+//     if (observer->onBorderHitCallback) {
+//         if (observer->currX <= 0) {
+//             observer->onBorderHitCallback(SCREEN_LEFT);
+//         }
+//         else if (observer->currX >= screenWidth - 1) {
+//             observer->onBorderHitCallback(SCREEN_RIGHT);
+//         }
+//         else if (observer->currY <= 0) {
+//             observer->onBorderHitCallback(SCREEN_TOP);
+//         }
+//         else if (observer->currY >= screenHeight - 1) {
+//             observer->onBorderHitCallback(SCREEN_BOTTOM);
+//         }
+//     }
+
+//     if (observer->currScreen < SCREEN_END) {
+//         if (observer->onMoveCallback) {
+//             observer->onMoveCallback(xDelta, yDelta);
+//             if (observer->currX == 0) {
+
+//             }
+//         }
+//         // CGWarpMouseCursorPosition(CGPointMake(screenWidth / 2, screenHeight / 2));
+
+//         // observer->setMousePosition(screenWidth / 2, screenHeight / 2);
+//     }
+
+//     return event;
+// }
+
+// void InputObserver::HIDCallback(void* context, IOReturn result, void* sender, IOHIDValueRef value) {
+//     InputObserver* observer = InputObserver::instance;
+//     if (!observer) return;
+
+//     IOHIDElementRef element = IOHIDValueGetElement(value);
+//     uint32_t usagePage = IOHIDElementGetUsagePage(element);
+//     uint32_t usage = IOHIDElementGetUsage(element);
+
+//     // Ensure the event is related to mouse movement
+//     if (usagePage == kHIDPage_GenericDesktop) {
+//         int x1, y1;
+//         observer->getMousePosition(x1, y1);
+//         int intValue = IOHIDValueGetIntegerValue(value);
+
+//         if (intValue != 0) {
+//             int screenWidth = observer->screenWidth;
+//             int screenHeight = observer->screenHeight;
+
+//             if (usage == kHIDUsage_GD_X) {
+//                 observer->getMousePosition(observer->currX, observer->currY);
+//                 if (observer->onBorderHitCallback) {
+//                     if (observer->currX <= 0) {
+//                         observer->onBorderHitCallback(SCREEN_LEFT);
+//                     }
+//                     else if (observer->currX >= screenWidth - 1) {
+//                         observer->onBorderHitCallback(SCREEN_RIGHT);
+//                     }
+//                 }
+
+//                 if (observer->currScreen < SCREEN_END) {
+//                     if (observer->onMoveCallback) {
+//                         observer->onMoveCallback(eAxis::X_AXIS, intValue);
+//                     }
+//                     observer->setMousePosition(screenWidth / 2, screenHeight / 2);
+//                 }
+//             }
+//             else if (usage == kHIDUsage_GD_Y) {
+
+//                 observer->getMousePosition(observer->currX, observer->currY);
+//                 if (observer->onBorderHitCallback) {
+//                     if (observer->currY <= 0) {
+//                         observer->onBorderHitCallback(SCREEN_TOP);
+//                     }
+//                     else if (observer->currY >= screenHeight - 1) {
+//                         observer->onBorderHitCallback(SCREEN_BOTTOM);
+//                     }
+//                 }
+
+//                 if (observer->currScreen < SCREEN_END) {
+//                     if (observer->onMoveCallback) {
+//                         observer->onMoveCallback(eAxis::Y_AXIS, intValue);
+//                     }
+//                     observer->setMousePosition(screenWidth / 2, screenHeight / 2);
+//                 }
+//             }
+//         }
+//     }
+// }
 
     CGEventRef InputObserver::keyEventCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon) {
         if (type == kCGEventKeyDown || type == kCGEventKeyUp) {
@@ -505,6 +589,7 @@ void InputObserver::setMousePosition(int x, int y) {
     SetCursorPos(x, y);
 #elif __APPLE__
     CGWarpMouseCursorPosition(CGPointMake(x, y));
+    positionReset = true;
 #elif __linux__
     Window root_window = DefaultRootWindow(display);
     XWarpPointer(display, None, root_window, 0, 0, 0, 0, x, y);
