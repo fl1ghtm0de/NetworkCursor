@@ -35,6 +35,7 @@ struct SPacketKeyboardInput {
     int32_t header;
     eKey key;
     eOS os;
+    bool isPressed;
 };
 
 struct SPacketResponse {

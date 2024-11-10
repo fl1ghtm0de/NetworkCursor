@@ -12,7 +12,7 @@
 
 InputObserver* InputObserver::instance = nullptr;
 
-InputObserver::InputObserver(const std::function<void(int, int)>& moveCallback, const std::function<void(eKey)>& keyPressCallback, const std::function<void(int)>& borderHitCallback)
+InputObserver::InputObserver(const std::function<void(int, int)>& moveCallback, const std::function<void(eKey, bool)>& keyPressCallback, const std::function<void(int)>& borderHitCallback)
     : onMoveCallback(moveCallback), onKeyPressCallback(keyPressCallback), onBorderHitCallback(borderHitCallback), mouseMoveThreadRunning(true) {
 #ifdef _WIN32
 //
@@ -167,15 +167,19 @@ LRESULT CALLBACK InputObserver::WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
 }
 
 LRESULT CALLBACK InputObserver::LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
-    if (nCode == HC_ACTION && (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN)) {
+    if (nCode == HC_ACTION) {
         KBDLLHOOKSTRUCT* pKeyboard = reinterpret_cast<KBDLLHOOKSTRUCT*>(lParam);
+
+        bool isKeyPressed = (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN);
 
         for (const auto& pair : windowsKeyMap) {
             if (pair.first == pKeyboard->vkCode) {
                 eKey foundKey = pair.second;
                 if (instance->onKeyPressCallback && instance->currScreen < SCREEN_END) {
-                    instance->onKeyPressCallback(foundKey);
-                    return 1;
+                    //std::cout << "Key event detected: VK_CODE " << pKeyboard->vkCode
+                    //    << (isKeyPressed ? " down" : " up") << std::endl;
+                    instance->onKeyPressCallback(foundKey, isKeyPressed); // Callback with key state
+                    return 1; // Block the key event
                 }
             }
         }
@@ -185,18 +189,19 @@ LRESULT CALLBACK InputObserver::LowLevelKeyboardProc(int nCode, WPARAM wParam, L
     return CallNextHookEx(NULL, nCode, wParam, lParam);
 }
 
+
 LRESULT CALLBACK InputObserver::LowLevelMouseProc(int nCode, WPARAM wParam, LPARAM lParam) {
     if (nCode == HC_ACTION) {
         // Check if it's a left or right mouse button down event
         if (wParam == WM_LBUTTONDOWN) {
             if (instance->onKeyPressCallback && instance->currScreen < SCREEN_END) {
-                instance->onKeyPressCallback(eKey::KEY_LCLICK);
+                instance->onKeyPressCallback(eKey::KEY_LCLICK, true);
                 return 1;
             }
         }
         else if (wParam == WM_RBUTTONDOWN) {
             if (instance->onKeyPressCallback && instance->currScreen < SCREEN_END) {
-                instance->onKeyPressCallback(eKey::KEY_RCLICK);
+                instance->onKeyPressCallback(eKey::KEY_RCLICK, true);
                 return 1;
             }
         }

@@ -37,7 +37,7 @@ public:
     void removeClient(int clientDirection);
 
     void sendMouseMovePacket(int axis, int value);
-    void sendKeyPressPacket(eKey keyID);
+    void sendKeyPressPacket(eKey keyID, bool isPressed);
     void setCurrentScreen(int direction);
 
     void shutdown();

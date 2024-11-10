@@ -17,8 +17,8 @@ Server::Server() :
         [this](int xDelta, int yDelta) {
             sendMouseMovePacket(xDelta, yDelta);
         },
-        [this](eKey keyCode) {
-            sendKeyPressPacket(keyCode);
+        [this](eKey keyCode, bool isPressed) {
+            sendKeyPressPacket(keyCode, isPressed);
         },
         [this](int screenDirection) {
             setCurrentScreen(screenDirection);
@@ -274,7 +274,7 @@ void Server::sendMouseMovePacket(int xDelta, int yDelta) {
     }
 }
 
-void Server::sendKeyPressPacket(eKey keyID) {
+void Server::sendKeyPressPacket(eKey keyID, bool isPressed) {
     SPacketKeyboardInput packet = { HEADER_KEYBOARD_INPUT, keyID };
 #ifdef _WIN32
     packet.os = eOS::WIN_OS;
@@ -283,6 +283,7 @@ void Server::sendKeyPressPacket(eKey keyID) {
 #elif __linux__
     packet.os = eOS::LINUX_OS;
 #endif
+    packet.isPressed = isPressed;
     if (currentScreen < SCREEN_END) {
         sendPacketToClient(currentScreen, &packet, sizeof(packet));
     }

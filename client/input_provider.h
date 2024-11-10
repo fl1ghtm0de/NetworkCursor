@@ -10,6 +10,8 @@
 
 #include "common/keyMappings.h"
 
+#include <map>
+
 class InputProvider {
 public:
 	InputProvider();
@@ -19,8 +21,10 @@ public:
 	void moveByOffset(int offsetX, int offsetY);
 	void setMousePosition(int x, int y);
 	int getPlatformKeyCode(eKey key);
-	void simulateKeyPress(int key);
+	void simulateKeyPress(int key, bool isPressed);
 	void simulateMouseClick(eKey key);
+
+	std::map<int, int> pressedKeys;
 };
 
 #endif

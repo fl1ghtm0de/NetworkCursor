@@ -25,7 +25,7 @@
 class InputObserver {
 public:
     // Constructor with callback
-    InputObserver(const std::function<void(int, int)>& callback, const std::function<void(eKey)>& keyPressCallback, const std::function<void(int)>& borderHitcallback);
+    InputObserver(const std::function<void(int, int)>& callback, const std::function<void(eKey, bool)>& keyPressCallback, const std::function<void(int)>& borderHitcallback);
     ~InputObserver();
 
 #ifdef _WIN32
@@ -73,7 +73,7 @@ private:
     //SMouseCoords sMouseData;
     bool mouseMoveThreadRunning;
     std::function<void(int, int)> onMoveCallback;  // Callback for mouse movement
-    std::function<void(eKey)> onKeyPressCallback;
+    std::function<void(eKey, bool)> onKeyPressCallback;
     std::function<void(int)> onBorderHitCallback;
 
     std::thread mouseMoveThread;

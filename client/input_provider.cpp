@@ -71,41 +71,77 @@ void InputProvider::setMousePosition(int x, int y) {
 #endif
 }
 
-void InputProvider::simulateKeyPress(int key)
+void InputProvider::simulateKeyPress(int key, bool isPressed)
+{
 #ifdef _WIN32
-{
-    // KEYDOWN event
-    INPUT input;
-    input.type = INPUT_KEYBOARD;
-    input.ki.wVk = key;  // Virtual-key code
-    input.ki.dwFlags = 0;   // KEYEVENTF_KEYDOWN
-    input.ki.time = 0;
-    input.ki.wScan = 0;     // Hardware scan code
-    input.ki.dwExtraInfo = 0;
-
-    SendInput(1, &input, sizeof(INPUT));
-
-    // KEYUP event
-    input.ki.dwFlags = KEYEVENTF_KEYUP;
-    SendInput(1, &input, sizeof(INPUT));
-}
+    // Wenn die Taste gedrückt wird
+    if (isPressed) {
+        // Prüfen, ob die Taste bereits gedrückt ist
+        if (pressedKeys.find(key) == pressedKeys.end()) {
+            INPUT input = {};
+            input.type = INPUT_KEYBOARD;
+            input.ki.wVk = key;       // Virtual-key code
+            input.ki.dwFlags = 0;     // KEYEVENTF_KEYDOWN
+            SendInput(1, &input, sizeof(INPUT));
+            pressedKeys[key] = key;   // Taste zur Map hinzufügen
+        }
+    }
+    // Wenn die Taste losgelassen wird
+    else {
+        // Prüfen, ob die Taste gedrückt war
+        if (pressedKeys.find(key) != pressedKeys.end()) {
+            INPUT input = {};
+            input.type = INPUT_KEYBOARD;
+            input.ki.wVk = key;
+            input.ki.dwFlags = KEYEVENTF_KEYUP; // KEYUP event
+            SendInput(1, &input, sizeof(INPUT));
+            pressedKeys.erase(key);             // Taste aus Map entfernen
+        }
+    }
 #elif __APPLE__
-{
-    // Create key down event
-    CGEventRef keyDownEvent = CGEventCreateKeyboardEvent(NULL, (CGKeyCode)key, true);
-    CGEventPost(kCGHIDEventTap, keyDownEvent);
-
-    // Create key up event
-    CGEventRef keyUpEvent = CGEventCreateKeyboardEvent(NULL, (CGKeyCode)key, false);
-    CGEventPost(kCGHIDEventTap, keyUpEvent);
-
-    // Release events
-    CFRelease(keyDownEvent);
-    CFRelease(keyUpEvent);
-}
+    // Wenn die Taste gedrückt wird
+    if (isPressed) {
+        if (pressedKeys.find(key) == pressedKeys.end()) {
+            CGEventRef keyDownEvent = CGEventCreateKeyboardEvent(NULL, (CGKeyCode)key, true);
+            CGEventPost(kCGHIDEventTap, keyDownEvent);
+            CFRelease(keyDownEvent);
+            pressedKeys[key] = key;
+        }
+    }
+    // Wenn die Taste losgelassen wird
+    else {
+        if (pressedKeys.find(key) != pressedKeys.end()) {
+            CGEventRef keyUpEvent = CGEventCreateKeyboardEvent(NULL, (CGKeyCode)key, false);
+            CGEventPost(kCGHIDEventTap, keyUpEvent);
+            CFRelease(keyUpEvent);
+            pressedKeys.erase(key);
+        }
+    }
 #elif __linux__
+    Display* display = XOpenDisplay(NULL);
+    if (display == NULL) {
+        std::cerr << "Unable to open X display" << std::endl;
+        return;
+    }
 
+    if (isPressed) {
+        if (pressedKeys.find(key) == pressedKeys.end()) {
+            XTestFakeKeyEvent(display, key, True, CurrentTime); // Key down
+            pressedKeys[key] = key;
+        }
+    }
+    else {
+        if (pressedKeys.find(key) != pressedKeys.end()) {
+            XTestFakeKeyEvent(display, key, False, CurrentTime); // Key up
+            pressedKeys.erase(key);
+        }
+    }
+
+    XFlush(display);
+    XCloseDisplay(display);
 #endif
+}
+
 
 void InputProvider::simulateMouseClick(eKey key)
 {
