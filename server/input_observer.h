@@ -20,36 +20,12 @@
 #endif
 
 #include "common/defines.h"
-
-
-struct SMouseCoords {
-    int32_t xDelta;
-    int32_t yDelta;
-
-    SMouseCoords() : xDelta(0), yDelta(0) {}
-
-#ifdef _WIN32
-    void setFromLong(LONG x, LONG y) {
-        xDelta = (x < INT32_MIN) ? INT32_MIN : (x > INT32_MAX) ? INT32_MAX : static_cast<int32_t>(x);
-        yDelta = (y < INT32_MIN) ? INT32_MIN : (y > INT32_MAX) ? INT32_MAX : static_cast<int32_t>(y);
-    }
-#elif __APPLE__
-    void setFromLong(int64_t x, int64_t y) {
-        xDelta = (x < std::numeric_limits<int32_t>::min()) ? std::numeric_limits<int32_t>::min()
-                : (x > std::numeric_limits<int32_t>::max()) ? std::numeric_limits<int32_t>::max()
-                : static_cast<int32_t>(x);
-        yDelta = (y < std::numeric_limits<int32_t>::min()) ? std::numeric_limits<int32_t>::min()
-                : (y > std::numeric_limits<int32_t>::max()) ? std::numeric_limits<int32_t>::max()
-                : static_cast<int32_t>(y);
-    }
-#endif
-};
-
+#include "common/keyMappings.h"
 
 class InputObserver {
 public:
     // Constructor with callback
-    InputObserver(const std::function<void(int, int)>& callback, const std::function<void(int)>& keyPressCallback, const std::function<void(int)>& borderHitcallback);
+    InputObserver(const std::function<void(int, int)>& callback, const std::function<void(eKey)>& keyPressCallback, const std::function<void(int)>& borderHitcallback);
     ~InputObserver();
 
 #ifdef _WIN32
@@ -61,6 +37,9 @@ public:
     WNDCLASS wc;
     HWND hwnd;
     HHOOK keyboardHook;
+
+    LONG xDelta;
+    LONG yDelta;
 #elif __APPLE__
     int* xDelta = nullptr;
     int* yDelta = nullptr;
@@ -77,9 +56,8 @@ public:
     // Move the mouse by an offset
     void moveByOffset(int offsetX, int offsetY);
     void getScreenDimensions(int& width, int& height);
-    void setLocked(bool state);
-
     bool isAtBorder();
+
     bool isRunning = false;
     bool positionReset = false;
     int currScreen = SCREEN_END;
@@ -90,10 +68,10 @@ private:
     int currX;
     int currY;
 
-    SMouseCoords sMouseData;
+    //SMouseCoords sMouseData;
     bool mouseMoveThreadRunning;
     std::function<void(int, int)> onMoveCallback;  // Callback for mouse movement
-    std::function<void(int)> onKeyPressCallback;
+    std::function<void(eKey)> onKeyPressCallback;
     std::function<void(int)> onBorderHitCallback;
 
     std::thread mouseMoveThread;

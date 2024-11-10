@@ -1,5 +1,6 @@
 #include "input_observer.h"
 #include "common/defines.h"
+#include "common/keyMappings.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -9,38 +10,9 @@
 #include <X11/Xlib.h>
 #endif
 
-#ifdef _WIN32
-std::map<int, std::string> keyMap = {
-    {0x41, "A"}, {0x42, "B"}, {0x43, "C"}, {0x44, "D"}, {0x45, "E"},
-    {0x46, "F"}, {0x47, "G"}, {0x48, "H"}, {0x49, "I"}, {0x4A, "J"},
-    {0x4B, "K"}, {0x4C, "L"}, {0x4D, "M"}, {0x4E, "N"}, {0x4F, "O"},
-    {0x50, "P"}, {0x51, "Q"}, {0x52, "R"}, {0x53, "S"}, {0x54, "T"},
-    {0x55, "U"}, {0x56, "V"}, {0x57, "W"}, {0x58, "X"}, {0x59, "Y"},
-    {0x5A, "Z"}, {0x30, "0"}, {0x31, "1"}, {0x32, "2"}, {0x33, "3"},
-    {0x34, "4"}, {0x35, "5"}, {0x36, "6"}, {0x37, "7"}, {0x38, "8"},
-    {0x39, "9"}, {VK_RETURN, "Enter"}, {VK_SPACE, "Space"},
-    {VK_TAB, "Tab"}, {VK_BACK, "Backspace"}, {VK_ESCAPE, "Escape"},
-    {VK_SHIFT, "Shift"}, {VK_CONTROL, "Control"}, {VK_MENU, "Alt"}
-};
-#elif __APPLE__
-std::map<int, std::string> keyMap = {
-    {0x00, "A"}, {0x0B, "B"}, {0x08, "C"}, {0x02, "D"}, {0x0E, "E"},
-    {0x03, "F"}, {0x05, "G"}, {0x04, "H"}, {0x22, "I"}, {0x26, "J"},
-    {0x28, "K"}, {0x25, "L"}, {0x2E, "M"}, {0x2D, "N"}, {0x1F, "O"},
-    {0x23, "P"}, {0x0C, "Q"}, {0x0F, "R"}, {0x01, "S"}, {0x13, "T"},
-    {0x09, "V"}, {0x0D, "W"}, {0x07, "X"}, {0x10, "Y"}, {0x06, "Z"},
-    {0x12, "1"}, {0x13, "2"}, {0x14, "3"}, {0x15, "4"}, {0x17, "5"},
-    {0x16, "6"}, {0x1A, "7"}, {0x1C, "8"}, {0x19, "9"}, {0x1D, "0"},
-    {0x24, "Return"}, {0x31, "Space"}, {0x30, "Tab"}, {0x33, "Delete"},
-    {0x35, "Escape"}, {0x38, "Shift"}, {0x3B, "Control"}, {0x3A, "Option"}, {0x37, "Command"},
-};
-#elif __linux__
-// missing
-#endif
-
 InputObserver* InputObserver::instance = nullptr;
 
-InputObserver::InputObserver(const std::function<void(int, int)>& moveCallback, const std::function<void(int)>& keyPressCallback, const std::function<void(int)>& borderHitCallback)
+InputObserver::InputObserver(const std::function<void(int, int)>& moveCallback, const std::function<void(eKey)>& keyPressCallback, const std::function<void(int)>& borderHitCallback)
     : onMoveCallback(moveCallback), onKeyPressCallback(keyPressCallback), onBorderHitCallback(borderHitCallback), mouseMoveThreadRunning(true) {
 #ifdef _WIN32
 //
@@ -129,10 +101,10 @@ LRESULT CALLBACK InputObserver::WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
     }
 
     if (uMsg == WM_INPUT) {
-        UINT dwSize;
+        UINT dwSize = 0;
         GetRawInputData((HRAWINPUT)lParam, RID_INPUT, NULL, &dwSize, sizeof(RAWINPUTHEADER));
-
         LPBYTE lpb = new BYTE[dwSize];
+
         if (lpb == NULL) {
             return 0;
         }
@@ -142,7 +114,6 @@ LRESULT CALLBACK InputObserver::WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
 
             if (raw->header.dwType == RIM_TYPEMOUSE) {
                 // Update the raw mouse deltas
-                observer->sMouseData.setFromLong(raw->data.mouse.lLastX, raw->data.mouse.lLastY);
                 observer->getMousePosition(observer->currX, observer->currY);
 
                 if (observer->onBorderHitCallback) {
@@ -173,8 +144,7 @@ LRESULT CALLBACK InputObserver::WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
 
                 if (observer->currScreen < SCREEN_END) {
                     if (observer->onMoveCallback) {
-                        observer->onMoveCallback(eAxis::X_AXIS, observer->sMouseData.xDelta);
-                        observer->onMoveCallback(eAxis::Y_AXIS, observer->sMouseData.yDelta);
+                        observer->onMoveCallback(raw->data.mouse.lLastX, raw->data.mouse.lLastY);
                     }
 
                     observer->setMousePosition(observer->screenWidth / 2, observer->screenHeight / 2);
@@ -192,20 +162,24 @@ LRESULT CALLBACK InputObserver::WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
 LRESULT CALLBACK InputObserver::LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
     if (nCode == HC_ACTION && (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN)) {
         KBDLLHOOKSTRUCT* pKeyboard = reinterpret_cast<KBDLLHOOKSTRUCT*>(lParam);
-        int key = pKeyboard->vkCode;
 
-        if (keyMap.find(key) != keyMap.end()) {
-            if (instance->onKeyPressCallback && instance->currScreen < SCREEN_END) {
-                instance->onKeyPressCallback(key);
+        bool found = false;
+        for (const auto& pair : windowsKeyMap) {
+            if (pair.first == pKeyboard->vkCode) {
+                eKey foundKey = pair.second;
+                if (instance->onKeyPressCallback && instance->currScreen < SCREEN_END) {
+                    instance->onKeyPressCallback(foundKey);
+                }
+                found = true;
             }
-            //return 1;
         }
-        else {
-            std::cout << "Key pressed: VK_CODE " << key << std::endl;
-        }
+
+        if (!found)
+            std::cout << "VK_CODE: " << pKeyboard->vkCode << " not found" << std::endl;
     }
     return CallNextHookEx(NULL, nCode, wParam, lParam);
 }
+
 
 void InputObserver::RegisterGlobalRawMouseInput(HWND hwnd) {
     RAWINPUTDEVICE rid;
@@ -368,8 +342,8 @@ void InputObserver::HIDInputCallback(void* context, IOReturn result, void* sende
 
             // Print the key code
             std::cout << "Key code: " << keyCode << (type == kCGEventKeyDown ? " pressed" : " released") << std::endl;
-            if (keyMap.find(keyCode) != keyMap.end()) {
-                std::cout << "Blocking code: " << keyMap.at(keyCode) << std::endl;
+            if (macKeyMap.find(keyCode) != keymacKeyMapMap.end()) {
+                std::cout << "Blocking code: " << macKeyMap.at(keyCode) << std::endl;
                 // return nullptr;
             }
             // Check if the key is in the blocked list

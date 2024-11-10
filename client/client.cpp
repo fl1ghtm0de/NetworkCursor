@@ -133,7 +133,8 @@ void Client::startListening() {
                     case HEADER_KEYBOARD_INPUT: {
                         SPacketKeyboardInput packet;
                         std::memcpy(&packet, buffer, sizeof(SPacketKeyboardInput));
-                        std::cout << "received keyboard input | key: " << (char)packet.key << std::endl;
+                        std::cout << "received keyboard input | key: " << packet.key << std::endl;
+                        //inputProvider.keyPress(packet.key);
                         break;
                     }
 
@@ -148,7 +149,11 @@ void Client::startListening() {
                 listening = false; // Stop listening if server disconnects
             }
             else {
+#ifdef _WIN32
                 std::cerr << "Receive failed: " << WSAGetLastError() << std::endl;
+#else
+                std::cerr << "Receive failed: " << strerror(errno) << std::endl;
+#endif
                 listening = false; // Stop listening on error
             }
         }

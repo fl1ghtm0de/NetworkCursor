@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <string>
 #include <map>
+#include "common/defines.h"
 #pragma pack(push, 1)  // Ensure no padding within structs
 
 struct SPacketAddClient {
@@ -32,7 +33,8 @@ struct SPacketMouseMoveResponse {
 
 struct SPacketKeyboardInput {
     int32_t header;
-    int32_t key;
+    eKey key;
+    eOS os;
 };
 
 struct SPacketResponse {
