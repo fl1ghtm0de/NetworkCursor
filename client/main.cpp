@@ -6,7 +6,7 @@
 #include "common/defines.h"  // Include this if it defines your IP address and port
 
 int main() {
-    std::string serverAddress = "192.168.10.46";  // or IP from defines.h
+    std::string serverAddress = "192.168.10.131";  // or IP from defines.h
     int port = PORT; // Assuming PORT is defined in defines.h
 
     Client client(serverAddress, port);

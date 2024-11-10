@@ -102,7 +102,7 @@ bool Client::sendPacket(void* packet, int size) {
         std::cerr << "Send failed: " << WSAGetLastError() << std::endl;
         return false;
     }
-    std::cout << "Message sent to the server." << std::endl;
+    //std::cout << "Message sent to the server." << std::endl;
     return true;
 }
 
@@ -123,10 +123,10 @@ void Client::startListening() {
 
                         int x;
                         int y;
+
                         inputProvider.getMousePosition(x, y);
                         SPacketMouseMoveResponse responsePacket = { HEADER_MOUSE_MOVE_RESPONSE, x, y };
                         sendPacket(&responsePacket, sizeof(responsePacket));
-                        //std::cout << "received mouse move | x: " << packet.xDelta << " y: " << packet.yDelta << std::endl;
                         break;
                     }
                     
