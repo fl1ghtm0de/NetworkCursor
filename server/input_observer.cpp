@@ -342,7 +342,7 @@ void InputObserver::HIDInputCallback(void* context, IOReturn result, void* sende
 
             // Print the key code
             std::cout << "Key code: " << keyCode << (type == kCGEventKeyDown ? " pressed" : " released") << std::endl;
-            if (macKeyMap.find(keyCode) != keymacKeyMapMap.end()) {
+            if (macKeyMap.find(keyCode) != macKeyMap.end()) {
                 std::cout << "Blocking code: " << macKeyMap.at(keyCode) << std::endl;
                 // return nullptr;
             }

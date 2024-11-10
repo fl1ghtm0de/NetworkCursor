@@ -1,7 +1,4 @@
 #include "KeyMappings.h"
-#include "windows.h"
-
-int i = VK_CONTROL;
 
 // Definiere die Windows KeyMap
 std::map<int, eKey> windowsKeyMap = {

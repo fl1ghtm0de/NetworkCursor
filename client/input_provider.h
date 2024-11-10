@@ -18,7 +18,7 @@ public:
 	void getMousePosition(int& x, int& y);
 	void moveByOffset(int offsetX, int offsetY);
 	void setMousePosition(int x, int y);
-	int getPlatformKeyCode(eKey key, eOS os);
+	int getPlatformKeyCode(eKey key);
 #ifdef _WIN32
 	void keyPress(WORD key);
 #elif __APPLE__

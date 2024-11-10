@@ -90,7 +90,11 @@ bool Client::connectToServer(int screenDirection) {
         std::cerr << "Server closed the connection unexpectedly." << std::endl;
     }
     else {
+        #ifdef _WIN32
         std::cerr << "Failed to receive response: " << WSAGetLastError() << std::endl;
+        #else
+        std::cerr << "Failed to receive response: " << strerror(errno) << std::endl;
+        #endif
     }
 
     return false;
@@ -99,7 +103,11 @@ bool Client::connectToServer(int screenDirection) {
 bool Client::sendPacket(void* packet, int size) {
     int sendResult = send(clientSocket, static_cast<char*>(packet), size, 0);
     if (sendResult == SOCKET_ERROR) {
+        #ifdef _WIN32
         std::cerr << "Send failed: " << WSAGetLastError() << std::endl;
+        #else
+        std::cerr << "Send failed: " << strerror(errno) << std::endl;
+        #endif
         return false;
     }
     //std::cout << "Message sent to the server." << std::endl;
@@ -129,11 +137,12 @@ void Client::startListening() {
                         sendPacket(&responsePacket, sizeof(responsePacket));
                         break;
                     }
-                    
+
                     case HEADER_KEYBOARD_INPUT: {
                         SPacketKeyboardInput packet;
                         std::memcpy(&packet, buffer, sizeof(SPacketKeyboardInput));
-                        std::cout << "received keyboard input | key: " << packet.key << std::endl;
+                        int mappedKey = inputProvider.getPlatformKeyCode(packet.key);
+                        std::cout << "received keyboard input | key: " << packet.key << " mapped key: " << mappedKey << std::endl;
                         //inputProvider.keyPress(packet.key);
                         break;
                     }

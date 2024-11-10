@@ -104,15 +104,19 @@ void InputProvider::keyPress(char key) {
 }
 #endif
 
-int InputProvider::getPlatformKeyCode(eKey key, eOS os) {
-    switch (os) {
-        case WIN_OS:
-            return windowsKeyMap[key];
-        case MAC_OS:
-            return macKeyMap[key];
-        case LINUX_OS:
-            return linuxKeyMap[key];
-        default:
-            return -1;  // Fehler: OS nicht unterstützt
-    }
+int InputProvider::getPlatformKeyCode(eKey key) {
+    for (const auto& pair :
+#ifdef _WIN32
+            windowsKeyMap
+#elif __APPLE__
+            macKeyMap
+#elif __linux__
+            linuxKeyMap
+#endif
+            ) {
+                if (pair.second == key)
+                    return pair.first;
+            }
+
+    return -1;
 }
