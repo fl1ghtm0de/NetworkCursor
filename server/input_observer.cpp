@@ -346,6 +346,9 @@ void InputObserver::HIDInputCallback(void* context, IOReturn result, void* sende
 
             observer->getMousePosition(observer->currX, observer->currY);
 
+            std::cout << "xDelta: " << *(observer->xDelta) << " yDelta: " << *(observer->yDelta) << " | x: " << observer->currX << " y: " << observer->currY << std::endl;
+
+
             if (observer->onBorderHitCallback) {
                 if (observer->currX <= 0) {
                     observer->onBorderHitCallback(SCREEN_LEFT);
@@ -361,15 +364,17 @@ void InputObserver::HIDInputCallback(void* context, IOReturn result, void* sende
                 }
             }
 
-            // Clean up memory and reset
+            if (observer->currScreen < SCREEN_END) {
+                if (observer->onMoveCallback) {
+                    observer->onMoveCallback(*(observer->xDelta), *(observer->yDelta));
+                    CGWarpMouseCursorPosition(CGPointMake(screenWidth / 2, screenHeight / 2));
+                }
+            }
+
             delete observer->xDelta;
             delete observer->yDelta;
             observer->xDelta = nullptr;
             observer->yDelta = nullptr;
-
-            if (observer->currScreen < SCREEN_END) {
-                CGWarpMouseCursorPosition(CGPointMake(screenWidth / 2, screenHeight / 2));
-            }
         }
     }
 }
