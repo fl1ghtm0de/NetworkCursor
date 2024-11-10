@@ -175,7 +175,7 @@ LRESULT CALLBACK InputObserver::LowLevelKeyboardProc(int nCode, WPARAM wParam, L
                 eKey foundKey = pair.second;
                 if (instance->onKeyPressCallback && instance->currScreen < SCREEN_END) {
                     instance->onKeyPressCallback(foundKey);
-                    //return 1;
+                    return 1;
                 }
             }
         }
@@ -191,13 +191,13 @@ LRESULT CALLBACK InputObserver::LowLevelMouseProc(int nCode, WPARAM wParam, LPAR
         if (wParam == WM_LBUTTONDOWN) {
             if (instance->onKeyPressCallback && instance->currScreen < SCREEN_END) {
                 instance->onKeyPressCallback(eKey::KEY_LCLICK);
-                //return 1;
+                return 1;
             }
         }
         else if (wParam == WM_RBUTTONDOWN) {
             if (instance->onKeyPressCallback && instance->currScreen < SCREEN_END) {
                 instance->onKeyPressCallback(eKey::KEY_RCLICK);
-                //return 1;
+                return 1;
             }
         }
     }
