@@ -339,15 +339,11 @@ void InputObserver::HIDInputCallback(void* context, IOReturn result, void* sende
             observer->yDelta = new int(movement);
         }
 
-        // Print deltas if both are set
         if (observer->xDelta && observer->yDelta) {
             int screenWidth = observer->screenWidth;
             int screenHeight = observer->screenHeight;
 
             observer->getMousePosition(observer->currX, observer->currY);
-
-            std::cout << "xDelta: " << *(observer->xDelta) << " yDelta: " << *(observer->yDelta) << " | x: " << observer->currX << " y: " << observer->currY << std::endl;
-
 
             if (observer->onBorderHitCallback) {
                 if (observer->currX <= 0) {
