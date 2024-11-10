@@ -71,37 +71,40 @@ void InputProvider::setMousePosition(int x, int y) {
 #endif
 }
 
+void InputProvider::simulateKeyPress(int key)
 #ifdef _WIN32
-void InputProvider::keyPress(WORD key) {
-    INPUT inputDown;
-    inputDown.type = INPUT_KEYBOARD;
-    inputDown.ki.wVk = key;    // Virtual-key code
-    inputDown.ki.wScan = 0;               // Hardware scan code (usually not needed)
-    inputDown.ki.dwFlags = 0;             // Key down event
-    inputDown.ki.time = 0;
-    inputDown.ki.dwExtraInfo = 0;
+{
+    // KEYDOWN event
+    INPUT input;
+    input.type = INPUT_KEYBOARD;
+    input.ki.wVk = key;  // Virtual-key code
+    input.ki.dwFlags = 0;   // KEYEVENTF_KEYDOWN
+    input.ki.time = 0;
+    input.ki.wScan = 0;     // Hardware scan code
+    input.ki.dwExtraInfo = 0;
 
-    // Prepare an INPUT structure for key up
-    INPUT inputUp = inputDown;
-    inputUp.ki.dwFlags = KEYEVENTF_KEYUP; // Key up event
+    SendInput(1, &input, sizeof(INPUT));
 
-    // Send both events in sequence
-    INPUT inputs[2] = { inputDown, inputUp };
-    SendInput(2, inputs, sizeof(INPUT));
+    // KEYUP event
+    input.ki.dwFlags = KEYEVENTF_KEYUP;
+    SendInput(1, &input, sizeof(INPUT));
 }
 #elif __APPLE__
-void InputProvider::keyPress(char key) {
-    CGEventRef keyDownEvent = CGEventCreateKeyboardEvent(nullptr, key, true);  // Key down
-    CGEventRef keyUpEvent = CGEventCreateKeyboardEvent(nullptr, key, false);    // Key up
+{
+    // Create key down event
+    CGEventRef keyDownEvent = CGEventCreateKeyboardEvent(NULL, (CGKeyCode)keyCode, true);
+    CGEventPost(kCGHIDEventTap, keyDownEvent);
 
-    if (keyDownEvent && keyUpEvent) {
-        CGEventPost(kCGHIDEventTap, keyDownEvent);  // Send key down event
-        CGEventPost(kCGHIDEventTap, keyUpEvent);    // Send key up event
-    }
+    // Create key up event
+    CGEventRef keyUpEvent = CGEventCreateKeyboardEvent(NULL, (CGKeyCode)keyCode, false);
+    CGEventPost(kCGHIDEventTap, keyUpEvent);
 
-    if (keyDownEvent) CFRelease(keyDownEvent);
-    if (keyUpEvent) CFRelease(keyUpEvent);
+    // Release events
+    CFRelease(keyDownEvent);
+    CFRelease(keyUpEvent);
 }
+#elif __linux__
+
 #endif
 
 int InputProvider::getPlatformKeyCode(eKey key) {

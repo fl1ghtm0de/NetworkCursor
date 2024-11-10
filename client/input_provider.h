@@ -19,11 +19,7 @@ public:
 	void moveByOffset(int offsetX, int offsetY);
 	void setMousePosition(int x, int y);
 	int getPlatformKeyCode(eKey key);
-#ifdef _WIN32
-	void keyPress(WORD key);
-#elif __APPLE__
-	void keyPress(char key);
-#endif
+	void simulateKeyPress(int key);
 };
 
 #endif

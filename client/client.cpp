@@ -143,6 +143,9 @@ void Client::startListening() {
                         std::memcpy(&packet, buffer, sizeof(SPacketKeyboardInput));
                         int mappedKey = inputProvider.getPlatformKeyCode(packet.key);
                         std::cout << "received keyboard input | key: " << packet.key << " mapped key: " << mappedKey << std::endl;
+                        if (mappedKey >= 0) {
+                            inputProvider.simulateKeyPress(mappedKey);
+                        }
                         //inputProvider.keyPress(packet.key);
                         break;
                     }
