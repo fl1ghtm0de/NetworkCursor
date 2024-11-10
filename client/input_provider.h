@@ -20,6 +20,7 @@ public:
 	void setMousePosition(int x, int y);
 	int getPlatformKeyCode(eKey key);
 	void simulateKeyPress(int key);
+	void simulateMouseClick(eKey key);
 };
 
 #endif

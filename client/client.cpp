@@ -141,12 +141,16 @@ void Client::startListening() {
                     case HEADER_KEYBOARD_INPUT: {
                         SPacketKeyboardInput packet;
                         std::memcpy(&packet, buffer, sizeof(SPacketKeyboardInput));
-                        int mappedKey = inputProvider.getPlatformKeyCode(packet.key);
-                        std::cout << "received keyboard input | key: " << packet.key << " mapped key: " << mappedKey << std::endl;
-                        if (mappedKey >= 0) {
-                            inputProvider.simulateKeyPress(mappedKey);
+                        if (packet.key == eKey::KEY_LCLICK || packet.key == eKey::KEY_RCLICK) {
+                            inputProvider.simulateMouseClick(packet.key);
                         }
-                        //inputProvider.keyPress(packet.key);
+                        else {
+                            int mappedKey = inputProvider.getPlatformKeyCode(packet.key);
+                            std::cout << "received keyboard input | key: " << packet.key << " mapped key: " << mappedKey << std::endl;
+                            if (mappedKey >= 0) {
+                                inputProvider.simulateKeyPress(mappedKey);
+                            }
+                        }
                         break;
                     }
 

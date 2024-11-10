@@ -92,11 +92,11 @@ void InputProvider::simulateKeyPress(int key)
 #elif __APPLE__
 {
     // Create key down event
-    CGEventRef keyDownEvent = CGEventCreateKeyboardEvent(NULL, (CGKeyCode)keyCode, true);
+    CGEventRef keyDownEvent = CGEventCreateKeyboardEvent(NULL, (CGKeyCode)key, true);
     CGEventPost(kCGHIDEventTap, keyDownEvent);
 
     // Create key up event
-    CGEventRef keyUpEvent = CGEventCreateKeyboardEvent(NULL, (CGKeyCode)keyCode, false);
+    CGEventRef keyUpEvent = CGEventCreateKeyboardEvent(NULL, (CGKeyCode)key, false);
     CGEventPost(kCGHIDEventTap, keyUpEvent);
 
     // Release events
@@ -106,6 +106,76 @@ void InputProvider::simulateKeyPress(int key)
 #elif __linux__
 
 #endif
+
+void InputProvider::simulateMouseClick(eKey key)
+{
+#ifdef _WIN32
+    // Windows implementation using SendInput
+    INPUT input[2] = {};
+
+    if (key == KEY_LCLICK) {
+        // Left mouse button down
+        input[0].type = INPUT_MOUSE;
+        input[0].mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
+
+        // Left mouse button up
+        input[1].type = INPUT_MOUSE;
+        input[1].mi.dwFlags = MOUSEEVENTF_LEFTUP;
+}
+    else if (key == KEY_RCLICK) {
+        // Right mouse button down
+        input[0].type = INPUT_MOUSE;
+        input[0].mi.dwFlags = MOUSEEVENTF_RIGHTDOWN;
+
+        // Right mouse button up
+        input[1].type = INPUT_MOUSE;
+        input[1].mi.dwFlags = MOUSEEVENTF_RIGHTUP;
+    }
+
+    // Send the input events
+    SendInput(2, input, sizeof(INPUT));
+
+#elif __APPLE__
+    // macOS implementation using CGEventCreateMouseEvent
+    CGEventType downEvent = (key == KEY_LCLICK) ? kCGEventLeftMouseDown : kCGEventRightMouseDown;
+    CGEventType upEvent = (key == KEY_LCLICK) ? kCGEventLeftMouseUp : kCGEventRightMouseUp;
+
+    // Get the current mouse position
+    CGPoint currentPos = CGEventGetLocation(CGEventCreate(NULL));
+
+    // Create and post the down event
+    CGEventRef clickDown = CGEventCreateMouseEvent(NULL, downEvent, currentPos,
+        (key == KEY_LCLICK) ? kCGMouseButtonLeft : kCGMouseButtonRight);
+    CGEventPost(kCGHIDEventTap, clickDown);
+    CFRelease(clickDown);
+
+    // Create and post the up event
+    CGEventRef clickUp = CGEventCreateMouseEvent(NULL, upEvent, currentPos,
+        (key == KEY_LCLICK) ? kCGMouseButtonLeft : kCGMouseButtonRight);
+    CGEventPost(kCGHIDEventTap, clickUp);
+    CFRelease(clickUp);
+
+#elif __linux__
+    // Linux implementation using XTestFakeButtonEvent (X11)
+    Display* display = XOpenDisplay(NULL);
+    if (display == NULL) {
+        std::cerr << "Unable to open X display" << std::endl;
+        return;
+    }
+
+    int button = (key == KEY_LCLICK) ? 1 : 3; // Button 1 = Left Click, Button 3 = Right Click
+
+    // Simulate mouse button down
+    XTestFakeButtonEvent(display, button, True, CurrentTime);
+
+    // Simulate mouse button up
+    XTestFakeButtonEvent(display, button, False, CurrentTime);
+
+    XFlush(display);
+    XCloseDisplay(display);
+
+#endif
+}
 
 int InputProvider::getPlatformKeyCode(eKey key) {
     for (const auto& pair :

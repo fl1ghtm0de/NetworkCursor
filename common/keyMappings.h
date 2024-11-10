@@ -43,7 +43,10 @@ enum eKey {
     KEY_DIVIDE,
 
     // Special system keys
-    KEY_LWIN, KEY_RWIN          // Left and Right Windows/Command keys
+    KEY_LWIN, KEY_RWIN,          // Left and Right Windows/Command keys
+
+    // Mouse keys
+    KEY_LCLICK, KEY_RCLICK
 };
 
 

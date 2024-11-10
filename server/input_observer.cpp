@@ -80,6 +80,12 @@ void InputObserver::start() {
             return;
         }
 
+        mouseHook = SetWindowsHookEx(WH_MOUSE_LL, LowLevelMouseProc, NULL, 0);
+            if (!mouseHook) {
+                std::cerr << "Failed to install mouse hook!" << std::endl;
+                return;
+            }
+
         // Run the message loop in this thread
         while (mouseMoveThreadRunning) {
             update();
@@ -88,6 +94,7 @@ void InputObserver::start() {
 
         // Cleanup: remove the keyboard hook and destroy the window
         UnhookWindowsHookEx(keyboardHook);
+        UnhookWindowsHookEx(mouseHook);
         DestroyWindow(hwnd);
         UnregisterClass("MessageOnlyWindowClass", hInstance);
         });
@@ -163,21 +170,39 @@ LRESULT CALLBACK InputObserver::LowLevelKeyboardProc(int nCode, WPARAM wParam, L
     if (nCode == HC_ACTION && (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN)) {
         KBDLLHOOKSTRUCT* pKeyboard = reinterpret_cast<KBDLLHOOKSTRUCT*>(lParam);
 
-        bool found = false;
         for (const auto& pair : windowsKeyMap) {
             if (pair.first == pKeyboard->vkCode) {
                 eKey foundKey = pair.second;
                 if (instance->onKeyPressCallback && instance->currScreen < SCREEN_END) {
                     instance->onKeyPressCallback(foundKey);
+                    //return 1;
                 }
-                found = true;
             }
         }
 
-        if (!found)
-            std::cout << "VK_CODE: " << pKeyboard->vkCode << " not found" << std::endl;
+        std::cout << "VK_CODE: " << pKeyboard->vkCode << " not found" << std::endl;
     }
     return CallNextHookEx(NULL, nCode, wParam, lParam);
+}
+
+LRESULT CALLBACK InputObserver::LowLevelMouseProc(int nCode, WPARAM wParam, LPARAM lParam) {
+    if (nCode == HC_ACTION) {
+        // Check if it's a left or right mouse button down event
+        if (wParam == WM_LBUTTONDOWN) {
+            if (instance->onKeyPressCallback && instance->currScreen < SCREEN_END) {
+                instance->onKeyPressCallback(eKey::KEY_LCLICK);
+                //return 1;
+            }
+        }
+        else if (wParam == WM_RBUTTONDOWN) {
+            if (instance->onKeyPressCallback && instance->currScreen < SCREEN_END) {
+                instance->onKeyPressCallback(eKey::KEY_RCLICK);
+                //return 1;
+            }
+        }
+    }
+
+    return CallNextHookEx(NULL, nCode, wParam, lParam); // Allow other events to pass
 }
 
 

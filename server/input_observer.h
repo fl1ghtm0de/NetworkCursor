@@ -31,12 +31,14 @@ public:
 #ifdef _WIN32
     static LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
     static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam);
+    static LRESULT CALLBACK LowLevelMouseProc(int nCode, WPARAM wParam, LPARAM lParam);
     void RegisterGlobalRawMouseInput(HWND hwnd);
 
     HINSTANCE hInstance;
     WNDCLASS wc;
     HWND hwnd;
     HHOOK keyboardHook;
+    HHOOK mouseHook;
 
     LONG xDelta;
     LONG yDelta;
