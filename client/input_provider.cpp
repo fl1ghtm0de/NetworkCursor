@@ -8,8 +8,25 @@
 #include <X11/Xlib.h>
 #endif
 
-InputProvider::InputProvider() {}
-InputProvider::~InputProvider() {}
+InputProvider::InputProvider() {
+    startHoldingKeys();
+}
+
+InputProvider::~InputProvider() {
+    stopHoldingKeys();
+}
+
+void InputProvider::startHoldingKeys() {
+    isRunning = true;
+    holdKeysThread = std::thread(&InputProvider::holdKeys, this);
+}
+
+void InputProvider::stopHoldingKeys() {
+    isRunning = false;
+    if (holdKeysThread.joinable()) {
+        holdKeysThread.join();
+    }
+}
 
 void InputProvider::getScreenDimensions(int& width, int& height) {
 #ifdef _WIN32
@@ -71,77 +88,17 @@ void InputProvider::setMousePosition(int x, int y) {
 #endif
 }
 
-void InputProvider::simulateKeyPress(int key, bool isPressed)
-{
-#ifdef _WIN32
-    // Wenn die Taste gedrückt wird
-    if (isPressed) {
-        // Prüfen, ob die Taste bereits gedrückt ist
-        if (pressedKeys.find(key) == pressedKeys.end()) {
-            INPUT input = {};
-            input.type = INPUT_KEYBOARD;
-            input.ki.wVk = key;       // Virtual-key code
-            input.ki.dwFlags = 0;     // KEYEVENTF_KEYDOWN
-            SendInput(1, &input, sizeof(INPUT));
-            pressedKeys[key] = key;   // Taste zur Map hinzufügen
-        }
-    }
-    // Wenn die Taste losgelassen wird
-    else {
-        // Prüfen, ob die Taste gedrückt war
-        if (pressedKeys.find(key) != pressedKeys.end()) {
-            INPUT input = {};
-            input.type = INPUT_KEYBOARD;
-            input.ki.wVk = key;
-            input.ki.dwFlags = KEYEVENTF_KEYUP; // KEYUP event
-            SendInput(1, &input, sizeof(INPUT));
-            pressedKeys.erase(key);             // Taste aus Map entfernen
-        }
-    }
-#elif __APPLE__
-    // Wenn die Taste gedrückt wird
-    if (isPressed) {
-        if (pressedKeys.find(key) == pressedKeys.end()) {
-            CGEventRef keyDownEvent = CGEventCreateKeyboardEvent(NULL, (CGKeyCode)key, true);
-            CGEventPost(kCGHIDEventTap, keyDownEvent);
-            CFRelease(keyDownEvent);
-            pressedKeys[key] = key;
-        }
-    }
-    // Wenn die Taste losgelassen wird
-    else {
-        if (pressedKeys.find(key) != pressedKeys.end()) {
-            CGEventRef keyUpEvent = CGEventCreateKeyboardEvent(NULL, (CGKeyCode)key, false);
-            CGEventPost(kCGHIDEventTap, keyUpEvent);
-            CFRelease(keyUpEvent);
-            pressedKeys.erase(key);
-        }
-    }
-#elif __linux__
-    Display* display = XOpenDisplay(NULL);
-    if (display == NULL) {
-        std::cerr << "Unable to open X display" << std::endl;
+void InputProvider::simulateKeyPress(int key, bool isPressed) {
+    if ((pressedKeys.find(key) != pressedKeys.end()) && isPressed) {
         return;
     }
-
-    if (isPressed) {
-        if (pressedKeys.find(key) == pressedKeys.end()) {
-            XTestFakeKeyEvent(display, key, True, CurrentTime); // Key down
-            pressedKeys[key] = key;
-        }
+    else if (!isPressed) {
+        pressedKeys.erase(key);
     }
     else {
-        if (pressedKeys.find(key) != pressedKeys.end()) {
-            XTestFakeKeyEvent(display, key, False, CurrentTime); // Key up
-            pressedKeys.erase(key);
-        }
+        pressedKeys.insert(key);
     }
-
-    XFlush(display);
-    XCloseDisplay(display);
-#endif
 }
-
 
 void InputProvider::simulateMouseClick(eKey key)
 {
@@ -228,4 +185,86 @@ int InputProvider::getPlatformKeyCode(eKey key) {
             }
 
     return -1;
+}
+
+void InputProvider::pressKey(int key) {
+#ifdef _WIN32
+    INPUT input = { 0 };
+    input.type = INPUT_KEYBOARD;
+    input.ki.wVk = key;
+    SendInput(1, &input, sizeof(INPUT));
+#elif __APPLE__
+    CGEventRef event = CGEventCreateKeyboardEvent(NULL, (CGKeyCode)key, true);
+    CGEventPost(kCGHIDEventTap, event);
+    CFRelease(event);
+#elif __linux__
+    Display* display = XOpenDisplay(NULL);
+    if (display == NULL) {
+        std::cerr << "Unable to open X display\n";
+        return;
+    }
+    KeyCode keycode = XKeysymToKeycode(display, key);
+    XTestFakeKeyEvent(display, keycode, True, CurrentTime);
+    XFlush(display);
+    XCloseDisplay(display);
+#endif
+}
+
+void InputProvider::releaseKey(int key) {
+#ifdef _WIN32
+    INPUT input = { 0 };
+    input.type = INPUT_KEYBOARD;
+    input.ki.wVk = key;
+    input.ki.dwFlags = KEYEVENTF_KEYUP;
+    SendInput(1, &input, sizeof(INPUT));
+#elif __APPLE__
+    CGEventRef event = CGEventCreateKeyboardEvent(NULL, (CGKeyCode)key, false);
+    CGEventPost(kCGHIDEventTap, event);
+    CFRelease(event);
+#elif __linux__
+    Display* display = XOpenDisplay(NULL);
+    if (display == NULL) {
+        std::cerr << "Unable to open X display\n";
+        return;
+    }
+    KeyCode keycode = XKeysymToKeycode(display, key);
+    XTestFakeKeyEvent(display, keycode, False, CurrentTime);
+    XFlush(display);
+    XCloseDisplay(display);
+#endif
+}
+
+void InputProvider::holdKeys() {
+    std::set<int> previousKeys;
+
+    while (isRunning) {  // Use isRunning to control the loop
+        {
+            std::lock_guard<std::mutex> lock(keyMutex);
+
+            // Press keys that are in pressedKeys but not in previousKeys
+            for (const int& key : pressedKeys) {
+                if (previousKeys.find(key) == previousKeys.end()) {
+                    pressKey(key);
+                }
+            }
+
+            // Release keys that are in previousKeys but not in pressedKeys
+            for (const int& key : previousKeys) {
+                if (pressedKeys.find(key) == pressedKeys.end()) {
+                    releaseKey(key);
+                }
+            }
+
+            // Update previousKeys to reflect the current state of pressedKeys
+            previousKeys = pressedKeys;
+        }
+
+        // Add a short delay to reduce CPU usage
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+
+    // Ensure all keys are released when stopping
+    for (const int& key : previousKeys) {
+        releaseKey(key);
+    }
 }

@@ -18,6 +18,7 @@ struct SMonitor {
     int width;
     int height;
     int direction;
+    std::map<int, std::shared_ptr<SMonitor>> neighbors;
 
     SOCKET_TYPE clientSocket;
 
@@ -34,4 +35,10 @@ enum eScreenDirections {
     SCREEN_BOTTOM,
     SCREEN_END
 };
+
+enum eAxis {
+    X_AXIS,
+    Y_AXIS
+};
+
 #pragma pack(pop)

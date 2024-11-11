@@ -12,8 +12,9 @@
     #define closeSocket close
 #endif
 
-Client::Client(const std::string& serverAddress, int port) {
-    inputProvider = InputProvider();
+Client::Client(const std::string& serverAddress, int port)
+    : inputProvider(), screenWidth(0), screenHeight(0) // Initialize inputProvider directly
+{
     inputProvider.getScreenDimensions(screenWidth, screenHeight);
 
 #ifdef _WIN32

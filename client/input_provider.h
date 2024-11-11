@@ -6,11 +6,17 @@
 #elif __APPLE__
 #include <ApplicationServices/ApplicationServices.h>
 #elif __linux__
+#include <X11/Xlib.h>
+#include <X11/keysym.h>
+#include <X11/extensions/XTest.h>
 #endif
 
 #include "common/keyMappings.h"
 
-#include <map>
+#include <set>
+#include <mutex>
+#include <thread>
+#include <chrono>
 
 class InputProvider {
 public:
@@ -24,7 +30,17 @@ public:
 	void simulateKeyPress(int key, bool isPressed);
 	void simulateMouseClick(eKey key);
 
-	std::map<int, int> pressedKeys;
+	std::set<int> pressedKeys;
+	std::mutex keyMutex;
+	std::thread holdKeysThread;
+	std::atomic<bool> isRunning;
+private:
+	void pressKey(int key);
+	void releaseKey(int key);
+	void holdKeys();
+
+	void startHoldingKeys();
+	void stopHoldingKeys();
 };
 
 #endif
