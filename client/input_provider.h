@@ -33,6 +33,9 @@ public:
 private:
 	void pressKey(int key);
 	void releaseKey(int key);
+
+	bool isDragging = false;
+
 #ifdef __APPLE__
 	void createMouseEvent(CGEventType type, CGPoint position, CGMouseButton button);
 #endif

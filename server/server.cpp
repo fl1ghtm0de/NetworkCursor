@@ -275,6 +275,7 @@ void Server::sendMouseMovePacket(int xDelta, int yDelta) {
 }
 
 void Server::sendKeyPressPacket(eKey keyID, bool isPressed) {
+    std::cout << "keyID: " << keyID << std::endl;
     SPacketKeyboardInput packet = { HEADER_KEYBOARD_INPUT, keyID };
 #ifdef _WIN32
     packet.os = eOS::WIN_OS;

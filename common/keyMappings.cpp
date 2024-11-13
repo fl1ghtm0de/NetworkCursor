@@ -1,4 +1,4 @@
-#include "KeyMappings.h"
+#include "keyMappings.h"
 
 // Definiere die Windows KeyMap
 std::map<int, eKey> windowsKeyMap = {

@@ -295,13 +295,17 @@ void InputObserver::start() {
     });
 
     keyPressThread = std::thread([this]() {
-        CGEventMask eventMask = CGEventMaskBit(kCGEventKeyDown) | CGEventMaskBit(kCGEventKeyUp);
+        // Include kCGEventFlagsChanged in the event mask to capture modifier key changes
+        CGEventMask eventMask = CGEventMaskBit(kCGEventKeyDown) |
+                                CGEventMaskBit(kCGEventKeyUp) |
+                                CGEventMaskBit(kCGEventFlagsChanged); // Add this line
+
         CFMachPortRef eventTap = CGEventTapCreate(
             kCGSessionEventTap,
             kCGHeadInsertEventTap,
             kCGEventTapOptionDefault,
             eventMask,
-            keyEventCallback,
+            keyEventCallback,  // Ensure this is a static function or global function
             nullptr
         );
 
@@ -379,25 +383,25 @@ void InputObserver::HIDInputCallback(void* context, IOReturn result, void* sende
 }
 
 
-    CGEventRef InputObserver::keyEventCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon) {
-        if (type == kCGEventKeyDown || type == kCGEventKeyUp) {
-            CGKeyCode keyCode = static_cast<CGKeyCode>(CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode));
+CGEventRef InputObserver::keyEventCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon) {
+    if (type == kCGEventKeyDown || type == kCGEventKeyUp || type == kCGEventFlagsChanged) {
+        // Get the key code for regular keys
+        CGKeyCode keyCode = static_cast<CGKeyCode>(CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode));
+        bool isKeyPressed = (type == kCGEventKeyDown);
 
-            // Print the key code
-            std::cout << "Key code: " << keyCode << (type == kCGEventKeyDown ? " pressed" : " released") << std::endl;
-            if (macKeyMap.find(keyCode) != macKeyMap.end()) {
-                std::cout << "Blocking code: " << macKeyMap.at(keyCode) << std::endl;
-                // return nullptr;
+        // Map and trigger callback if key exists
+        for (const auto& pair : macKeyMap) {
+            if (pair.first == keyCode) {
+                eKey foundKey = pair.second;
+                if (instance->onKeyPressCallback && instance->currScreen < SCREEN_END) {
+                    instance->onKeyPressCallback(foundKey, isKeyPressed);
+                    return nullptr; // Optionally block the key event
+                }
             }
-            // Check if the key is in the blocked list
-            // if (blockedKeys.find(keyCode) != blockedKeys.end()) {
-            //     std::cout << "Blocking key code: " << keyCode << std::endl;
-            //     return nullptr; // Return nullptr to block the event
-            // }
         }
-
-        return event; // Allow the event to proceed
     }
+    return event; // Allow the event to proceed if not blocked
+}
 #endif
 
 void InputObserver::stop() {
