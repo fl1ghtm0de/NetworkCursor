@@ -29,17 +29,16 @@ public:
 	int getPlatformKeyCode(eKey key);
 	void simulateKeyPress(int key, bool isPressed);
 	void simulateMouseClick(eKey key, bool isPressed);
-	void setMouseButtonState(eKey key, bool isPressed);
 
-	std::atomic<bool> holdButtonsThreadRunning = false;
-	std::thread holdLMB;
-	std::thread holdRMB;
 private:
 	void pressKey(int key);
 	void releaseKey(int key);
+#ifdef __APPLE__
+	void createMouseEvent(CGEventType type, CGPoint position, CGMouseButton button);
+#endif
+	bool lmbPressed = false;
+	bool rmbPressed = false;
 
-	bool lmbDown = false;
-	bool rmbDown = false;
 };
 
 #endif

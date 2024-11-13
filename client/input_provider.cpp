@@ -9,38 +9,9 @@
 #endif
 
 InputProvider::InputProvider() {
-    holdButtonsThreadRunning = true;
-
-    holdLMB = std::thread([this]() {
-        while (holdButtonsThreadRunning) {
-            if (lmbDown) {
-                simulateMouseClick(KEY_LCLICK, true); // Simulate LMB down
-                std::this_thread::sleep_for(std::chrono::milliseconds(1));
-            }
-            else {
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
-            }
-        }
-        });
-
-    holdRMB = std::thread([this]() {
-        while (holdButtonsThreadRunning) {
-            if (rmbDown) {
-                simulateMouseClick(KEY_RCLICK, true); // Simulate RMB down
-                std::this_thread::sleep_for(std::chrono::milliseconds(1));
-            }
-            else {
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
-            }
-        }
-        });
 }
 
 InputProvider::~InputProvider() {
-    holdButtonsThreadRunning = false;
-    if (holdLMB.joinable()) {
-        holdLMB.join();
-    }
 }
 
 void InputProvider::getScreenDimensions(int& width, int& height) {
@@ -88,7 +59,35 @@ void InputProvider::moveByOffset(int offsetX, int offsetY) {
     int newX = currentX + offsetX;
     int newY = currentY + offsetY;
 
+#ifndef __APPLE__
     setMousePosition(newX, newY);
+#else
+
+    CGPoint newPosition = CGPointMake(newX, newY);
+
+    // If lmbPressed is true, initiate a drag
+    if (lmbPressed) {
+        // Start the drag with a mouse down if not already dragging
+        if (!isDragging) {
+            // Set the current position as the start of the drag
+            createMouseEvent(kCGEventLeftMouseDown, CGPointMake(currentX, currentY), kCGMouseButtonLeft);
+            isDragging = true;
+        }
+        // Move the mouse to simulate dragging
+        createMouseEvent(kCGEventLeftMouseDragged, newPosition, kCGMouseButtonLeft);
+    }
+    else {
+        // If lmbPressed is false but dragging was active, release the mouse
+        if (isDragging) {
+            createMouseEvent(kCGEventLeftMouseUp, newPosition, kCGMouseButtonLeft);
+            isDragging = false;
+        }
+        else {
+            // If not dragging, just move the mouse normally
+            setMousePosition(newX, newY);
+        }
+    }
+#endif
 }
 
 void InputProvider::setMousePosition(int x, int y) {
@@ -112,24 +111,10 @@ void InputProvider::simulateKeyPress(int key, bool isPressed) {
     }
 }
 
-void InputProvider::setMouseButtonState(eKey key, bool isPressed) {
-    switch (key) {
-        case KEY_LCLICK:
-            if (isPressed)
-                lmbDown = true;
-            else
-                lmbDown = false;
-            break;
-        case KEY_RCLICK:
-            if (isPressed)
-                rmbDown = true;
-            else
-                rmbDown = false;
-            break;
-    }
-}
-
 void InputProvider::simulateMouseClick(eKey key, bool isPressed) {
+    if (key == KEY_LCLICK) lmbPressed = isPressed;
+    else if(key == KEY_RCLICK) lmbPressed = isPressed;
+
 #ifdef _WIN32
     // Windows implementation using SendInput
     INPUT input = {};
@@ -245,3 +230,11 @@ void InputProvider::releaseKey(int key) {
     XCloseDisplay(display);
 #endif
 }
+
+#ifdef __APPLE__
+void InputProvider::createMouseEvent(CGEventType type, CGPoint position, CGMouseButton button) {
+    CGEventRef event = CGEventCreateMouseEvent(NULL, type, position, button);
+    CGEventPost(kCGHIDEventTap, event);
+    CFRelease(event);
+}
+#endif
