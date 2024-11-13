@@ -9,22 +9,37 @@
 #endif
 
 InputProvider::InputProvider() {
-    //startHoldingKeys();
+    holdButtonsThreadRunning = true;
+
+    holdLMB = std::thread([this]() {
+        while (holdButtonsThreadRunning) {
+            if (lmbDown) {
+                simulateMouseClick(KEY_LCLICK, true); // Simulate LMB down
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+            else {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+        }
+        });
+
+    holdRMB = std::thread([this]() {
+        while (holdButtonsThreadRunning) {
+            if (rmbDown) {
+                simulateMouseClick(KEY_RCLICK, true); // Simulate RMB down
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+            else {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+        }
+        });
 }
 
 InputProvider::~InputProvider() {
-    //stopHoldingKeys();
-}
-
-void InputProvider::startHoldingKeys() {
-    isRunning = true;
-    holdKeysThread = std::thread(&InputProvider::holdKeys, this);
-}
-
-void InputProvider::stopHoldingKeys() {
-    isRunning = false;
-    if (holdKeysThread.joinable()) {
-        holdKeysThread.join();
+    holdButtonsThreadRunning = false;
+    if (holdLMB.joinable()) {
+        holdLMB.join();
     }
 }
 
@@ -94,6 +109,23 @@ void InputProvider::simulateKeyPress(int key, bool isPressed) {
     }
     else {
         releaseKey(key);
+    }
+}
+
+void InputProvider::setMouseButtonState(eKey key, bool isPressed) {
+    switch (key) {
+        case KEY_LCLICK:
+            if (isPressed)
+                lmbDown = true;
+            else
+                lmbDown = false;
+            break;
+        case KEY_RCLICK:
+            if (isPressed)
+                rmbDown = true;
+            else
+                rmbDown = false;
+            break;
     }
 }
 
@@ -212,39 +244,4 @@ void InputProvider::releaseKey(int key) {
     XFlush(display);
     XCloseDisplay(display);
 #endif
-}
-
-void InputProvider::holdKeys() {
-    std::set<int> previousKeys;
-
-    while (isRunning) {  // Use isRunning to control the loop
-        {
-            std::lock_guard<std::mutex> lock(keyMutex);
-
-            // Press keys that are in pressedKeys but not in previousKeys
-            for (const int& key : pressedKeys) {
-                if (previousKeys.find(key) == previousKeys.end()) {
-                    pressKey(key);
-                }
-            }
-
-            // Release keys that are in previousKeys but not in pressedKeys
-            for (const int& key : previousKeys) {
-                if (pressedKeys.find(key) == pressedKeys.end()) {
-                    releaseKey(key);
-                }
-            }
-
-            // Update previousKeys to reflect the current state of pressedKeys
-            previousKeys = pressedKeys;
-        }
-
-        // Add a short delay to reduce CPU usage
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    }
-
-    // Ensure all keys are released when stopping
-    for (const int& key : previousKeys) {
-        releaseKey(key);
-    }
 }

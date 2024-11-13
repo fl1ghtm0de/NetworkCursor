@@ -29,18 +29,17 @@ public:
 	int getPlatformKeyCode(eKey key);
 	void simulateKeyPress(int key, bool isPressed);
 	void simulateMouseClick(eKey key, bool isPressed);
+	void setMouseButtonState(eKey key, bool isPressed);
 
-	std::set<int> pressedKeys;
-	std::mutex keyMutex;
-	std::thread holdKeysThread;
-	std::atomic<bool> isRunning;
+	std::atomic<bool> holdButtonsThreadRunning = false;
+	std::thread holdLMB;
+	std::thread holdRMB;
 private:
 	void pressKey(int key);
 	void releaseKey(int key);
-	void holdKeys();
 
-	void startHoldingKeys();
-	void stopHoldingKeys();
+	bool lmbDown = false;
+	bool rmbDown = false;
 };
 
 #endif

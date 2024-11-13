@@ -189,7 +189,6 @@ LRESULT CALLBACK InputObserver::LowLevelKeyboardProc(int nCode, WPARAM wParam, L
     return CallNextHookEx(NULL, nCode, wParam, lParam);
 }
 
-
 LRESULT CALLBACK InputObserver::LowLevelMouseProc(int nCode, WPARAM wParam, LPARAM lParam) {
     if (nCode == HC_ACTION) {
         // Check for left mouse button events
