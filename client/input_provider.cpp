@@ -9,11 +9,11 @@
 #endif
 
 InputProvider::InputProvider() {
-    startHoldingKeys();
+    //startHoldingKeys();
 }
 
 InputProvider::~InputProvider() {
-    stopHoldingKeys();
+    //stopHoldingKeys();
 }
 
 void InputProvider::startHoldingKeys() {
@@ -89,14 +89,11 @@ void InputProvider::setMousePosition(int x, int y) {
 }
 
 void InputProvider::simulateKeyPress(int key, bool isPressed) {
-    if ((pressedKeys.find(key) != pressedKeys.end()) && isPressed) {
-        return;
-    }
-    else if (!isPressed) {
-        pressedKeys.erase(key);
+    if (isPressed) {
+        pressKey(key);
     }
     else {
-        pressedKeys.insert(key);
+        releaseKey(key);
     }
 }
 
