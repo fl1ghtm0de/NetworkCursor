@@ -143,7 +143,7 @@ void Client::startListening() {
                         SPacketKeyboardInput packet;
                         std::memcpy(&packet, buffer, sizeof(SPacketKeyboardInput));
                         if (packet.key == eKey::KEY_LCLICK || packet.key == eKey::KEY_RCLICK) {
-                            inputProvider.simulateMouseClick(packet.key);
+                            inputProvider.simulateMouseClick(packet.key, packet.isPressed);
                         }
                         else {
                             int mappedKey = inputProvider.getPlatformKeyCode(packet.key);

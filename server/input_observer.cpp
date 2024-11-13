@@ -192,24 +192,38 @@ LRESULT CALLBACK InputObserver::LowLevelKeyboardProc(int nCode, WPARAM wParam, L
 
 LRESULT CALLBACK InputObserver::LowLevelMouseProc(int nCode, WPARAM wParam, LPARAM lParam) {
     if (nCode == HC_ACTION) {
-        // Check if it's a left or right mouse button down event
+        // Check for left mouse button events
         if (wParam == WM_LBUTTONDOWN) {
             if (instance->onKeyPressCallback && instance->currScreen < SCREEN_END) {
-                instance->onKeyPressCallback(eKey::KEY_LCLICK, true);
+                instance->onKeyPressCallback(eKey::KEY_LCLICK, true); // Button down (pressed)
                 return 1;
             }
         }
+        else if (wParam == WM_LBUTTONUP) {
+            if (instance->onKeyPressCallback && instance->currScreen < SCREEN_END) {
+                instance->onKeyPressCallback(eKey::KEY_LCLICK, false); // Button up (released)
+                return 1;
+            }
+        }
+
+        // Check for right mouse button events
         else if (wParam == WM_RBUTTONDOWN) {
             if (instance->onKeyPressCallback && instance->currScreen < SCREEN_END) {
-                instance->onKeyPressCallback(eKey::KEY_RCLICK, true);
+                instance->onKeyPressCallback(eKey::KEY_RCLICK, true); // Button down (pressed)
+                return 1;
+            }
+        }
+        else if (wParam == WM_RBUTTONUP) {
+            if (instance->onKeyPressCallback && instance->currScreen < SCREEN_END) {
+                instance->onKeyPressCallback(eKey::KEY_RCLICK, false); // Button up (released)
                 return 1;
             }
         }
     }
 
-    return CallNextHookEx(NULL, nCode, wParam, lParam); // Allow other events to pass
+    // Pass the event to the next hook in the chain
+    return CallNextHookEx(NULL, nCode, wParam, lParam);
 }
-
 
 void InputObserver::RegisterGlobalRawMouseInput(HWND hwnd) {
     RAWINPUTDEVICE rid;

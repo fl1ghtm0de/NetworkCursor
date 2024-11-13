@@ -28,7 +28,7 @@ public:
 	void setMousePosition(int x, int y);
 	int getPlatformKeyCode(eKey key);
 	void simulateKeyPress(int key, bool isPressed);
-	void simulateMouseClick(eKey key);
+	void simulateMouseClick(eKey key, bool isPressed);
 
 	std::set<int> pressedKeys;
 	std::mutex keyMutex;
