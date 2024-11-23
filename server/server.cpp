@@ -221,17 +221,15 @@ void Server::sendPacketToClient(int clientDirection, void* packet, int size) {
     std::cout << "Attempting to send packet to direction: " << clientDirection << std::endl;
 
     SOCKET_TYPE clientSocket;
-    {
-        std::lock_guard<std::mutex> lock(mapMutex);
-        auto it = clientIDMap.find(clientDirection);
-        if (it != clientIDMap.end()) {
-            clientSocket = it->second.clientSocket;
-        }
-        else {
-            std::cerr << "Client direction: " << clientDirection << " not found." << std::endl;
-            setCurrentScreen(SCREEN_END);
-            return;
-        }
+    std::lock_guard<std::mutex> lock(mapMutex);
+    auto it = clientIDMap.find(clientDirection);
+    if (it != clientIDMap.end()) {
+        clientSocket = it->second.clientSocket;
+    }
+    else {
+        std::cerr << "Client direction: " << clientDirection << " not found." << std::endl;
+        setCurrentScreen(SCREEN_END);
+        return;
     }
 
     int sendResult = send(clientSocket, reinterpret_cast<char*>(packet), size, 0);
@@ -241,7 +239,7 @@ void Server::sendPacketToClient(int clientDirection, void* packet, int size) {
         #else
         std::cerr << "Failed to send packet to direction" << clientDirection << " error: " << strerror(errno) << std::endl;
         #endif
-        std::lock_guard<std::mutex> lock(mapMutex);
+        //std::lock_guard<std::mutex> unlock(mapMutex);
         clientIDMap.erase(clientDirection);
     }
     else {

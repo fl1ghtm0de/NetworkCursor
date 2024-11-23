@@ -171,7 +171,7 @@ LRESULT CALLBACK InputObserver::LowLevelKeyboardProc(int nCode, WPARAM wParam, L
         KBDLLHOOKSTRUCT* pKeyboard = reinterpret_cast<KBDLLHOOKSTRUCT*>(lParam);
 
         bool isKeyPressed = (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN);
-
+        std::cout << "pressed keycode: " << pKeyboard->vkCode << std::endl;
         for (const auto& pair : windowsKeyMap) {
             if (pair.first == pKeyboard->vkCode) {
                 eKey foundKey = pair.second;
@@ -179,12 +179,11 @@ LRESULT CALLBACK InputObserver::LowLevelKeyboardProc(int nCode, WPARAM wParam, L
                     //std::cout << "Key event detected: VK_CODE " << pKeyboard->vkCode
                     //    << (isKeyPressed ? " down" : " up") << std::endl;
                     instance->onKeyPressCallback(foundKey, isKeyPressed); // Callback with key state
-                    return 1; // Block the key event
+                    //return 1; // Block the key event
+                    return 0;
                 }
             }
         }
-
-        std::cout << "VK_CODE: " << pKeyboard->vkCode << " not found" << std::endl;
     }
     return CallNextHookEx(NULL, nCode, wParam, lParam);
 }
@@ -388,7 +387,7 @@ CGEventRef InputObserver::keyEventCallback(CGEventTapProxy proxy, CGEventType ty
         // Get the key code for regular keys
         CGKeyCode keyCode = static_cast<CGKeyCode>(CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode));
         bool isKeyPressed = (type == kCGEventKeyDown);
-
+        std::cout << "pressed keycode: " << keyCode << std::endl;
         // Map and trigger callback if key exists
         for (const auto& pair : macKeyMap) {
             if (pair.first == keyCode) {
